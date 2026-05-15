@@ -280,30 +280,88 @@
           <!-- إضافة كتاب -->
           <div class="memorix-card p-6 mb-6">
             <h3 class="font-bold mb-4" style="color: #00d4ff">➕ إضافة كتاب جديد</h3>
+
+            <!-- معلومات الكتاب -->
             <div class="grid md:grid-cols-3 gap-4 mb-4">
-              <input v-model="newBook.title" class="memorix-input" placeholder="عنوان الكتاب" dir="rtl" />
-              <input v-model="newBook.subject" class="memorix-input" placeholder="المادة" dir="rtl" />
+              <input v-model="newBook.title" class="memorix-input" placeholder="عنوان الكتاب *" dir="rtl" />
+              <input v-model="newBook.subject" class="memorix-input" placeholder="المادة *" dir="rtl" />
               <input v-model="newBook.grade" class="memorix-input" placeholder="الصف الدراسي" dir="rtl" />
             </div>
-            <textarea v-model="newBook.raw_text" class="memorix-input h-32 resize-none mb-4"
-                      placeholder="محتوى الكتاب (اختياري - سيُولَّد ملخص تلقائياً بالذكاء الاصطناعي)" dir="rtl" />
-            <button @click="addBook" class="btn-primary text-sm" :disabled="bookLoading">
-              {{ bookLoading ? '⏳ جاري الإضافة...' : '📖 إضافة الكتاب' }}
+
+            <!-- رفع ملف الكتاب (PDF أو PowerPoint) -->
+            <div class="mb-4">
+              <p class="text-xs mb-2" style="color:#94a3b8">
+                📎 ارفع الكتاب كملف لتوليد الملخص تلقائياً بالذكاء الاصطناعي
+              </p>
+              <input ref="bookFileInput" type="file"
+                     accept=".pdf,.pptx,.txt,.md"
+                     @change="onBookFileChange" style="display:none" />
+
+              <!-- منطقة الرفع -->
+              <div @click="$refs.bookFileInput?.click()" @dragover.prevent @drop.prevent="onBookFileDrop"
+                   style="cursor:pointer;border:2px dashed rgba(0,212,255,0.35);border-radius:12px;padding:24px;text-align:center;transition:all .2s;background:rgba(0,212,255,0.03)"
+                   :style="bookFileName ? 'border-color:#10b981;background:rgba(16,185,129,0.05)' : ''">
+
+                <!-- حالة: لا يوجد ملف -->
+                <div v-if="!bookFileName && !bookExtractLoading">
+                  <div style="font-size:36px;margin-bottom:8px">📄</div>
+                  <p style="color:#00d4ff;font-weight:600;margin-bottom:4px">اسحب الملف هنا أو اضغط للاختيار</p>
+                  <p style="color:#94a3b8;font-size:12px">PDF · PowerPoint (PPTX) · TXT</p>
+                </div>
+
+                <!-- حالة: يتم الاستخراج -->
+                <div v-else-if="bookExtractLoading" style="color:#fbbf24">
+                  <div style="font-size:32px;margin-bottom:8px">⏳</div>
+                  <p style="font-weight:600">جاري استخراج النص من الملف...</p>
+                </div>
+
+                <!-- حالة: تم الاستخراج بنجاح -->
+                <div v-else-if="bookFileText && !bookExtractLoading">
+                  <div style="font-size:32px;margin-bottom:8px">✅</div>
+                  <p style="color:#10b981;font-weight:700">{{ bookFileName }}</p>
+                  <p style="color:#94a3b8;font-size:12px;margin-top:4px">
+                    تم استخراج {{ Math.round(bookFileText.length / 1000) }}K حرف — سيُولَّد الملخص بالـ AI عند الإضافة
+                  </p>
+                  <button @click.stop="clearBookFile" style="margin-top:8px;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);color:#ef4444;border-radius:8px;padding:4px 12px;font-size:12px;cursor:pointer">
+                    🗑️ إزالة الملف
+                  </button>
+                </div>
+
+                <!-- حالة: خطأ في الاستخراج -->
+                <div v-else-if="bookExtractError">
+                  <div style="font-size:32px;margin-bottom:8px">⚠️</div>
+                  <p style="color:#ef4444;font-weight:600">{{ bookExtractError }}</p>
+                  <p style="color:#94a3b8;font-size:12px;margin-top:4px">اضغط للمحاولة مرة أخرى</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- زر الإضافة -->
+            <button @click="addBook" class="btn-primary text-sm flex items-center gap-2"
+                    :disabled="bookLoading || bookExtractLoading || !newBook.title || !newBook.subject">
+              <span v-if="bookLoading" class="inline-block w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              📖 {{ bookLoading ? (bookFileText ? '⏳ يُوَلِّد الملخص بالـ AI...' : '⏳ جاري الإضافة...') : 'إضافة الكتاب' }}
             </button>
+            <p class="text-xs mt-2" style="color:#94a3b8">
+              💡 يمكن إضافة الكتاب بدون ملف — الملخص سيُولَّد لاحقاً عند رفع الملف
+            </p>
           </div>
 
           <!-- قائمة الكتب -->
-          <div class="grid md:grid-cols-2 gap-4">
+          <div v-if="!books.length" class="memorix-card p-8 text-center" style="color:#94a3b8">
+            لا توجد كتب بعد. أضف كتابك الأول بالضغط على "إضافة كتاب جديد" أعلاه.
+          </div>
+          <div v-else class="grid md:grid-cols-2 gap-4">
             <div v-for="book in books" :key="book.id" class="memorix-card p-5">
               <div class="flex items-start justify-between mb-2">
                 <h4 class="font-bold">{{ book.title }}</h4>
                 <span class="text-xs px-2 py-1 rounded-full" style="background: rgba(74,126,255,0.15); color: #4a7eff">
-                  {{ book.grade }}
+                  {{ book.grade || 'غير محدد' }}
                 </span>
               </div>
-              <p class="text-xs mb-2" style="color: #8b5cf6">{{ book.subject }}</p>
-              <p class="text-sm line-clamp-3" style="color: #94a3b8">
-                {{ book.summary || 'لا يوجد ملخص بعد' }}
+              <p class="text-xs mb-3" style="color: #8b5cf6">📚 {{ book.subject }}</p>
+              <p class="text-sm line-clamp-3" style="color: #94a3b8; line-height:1.7">
+                {{ book.summary || '⏳ لم يُولَّد الملخص بعد — ارفع ملف الكتاب لتوليده' }}
               </p>
             </div>
           </div>
@@ -613,7 +671,79 @@ const passwordsLoading = ref(false)
 // الكتب
 const books = ref([])
 const bookLoading = ref(false)
-const newBook = ref({ title: '', subject: '', grade: '', raw_text: '' })
+const newBook = ref({ title: '', subject: '', grade: '' })
+const bookFileText = ref('')
+const bookFileName = ref('')
+const bookExtractLoading = ref(false)
+const bookExtractError = ref('')
+
+async function onBookFileChange(e) {
+  const file = e.target.files?.[0]
+  if (!file) return
+  await extractBookFile(file)
+  // إعادة تعيين input للسماح بإعادة اختيار نفس الملف
+  e.target.value = ''
+}
+
+function onBookFileDrop(e) {
+  const file = e.dataTransfer?.files?.[0]
+  if (!file) return
+  extractBookFile(file)
+}
+
+function clearBookFile() {
+  bookFileText.value = ''
+  bookFileName.value = ''
+  bookExtractError.value = ''
+}
+
+async function extractBookFile(file) {
+  if (file.size > 15 * 1024 * 1024) {
+    bookExtractError.value = 'الملف أكبر من 15MB — اختر ملفاً أصغر'
+    return
+  }
+  const allowed = ['.pdf', '.pptx', '.txt', '.md']
+  const ext = file.name.toLowerCase().slice(file.name.lastIndexOf('.'))
+  if (!allowed.includes(ext)) {
+    bookExtractError.value = `صيغة غير مدعومة (${ext}). استخدم: PDF أو PPTX أو TXT`
+    return
+  }
+
+  bookFileName.value = file.name
+  bookFileText.value = ''
+  bookExtractError.value = ''
+  bookExtractLoading.value = true
+
+  // TXT / MD — نقرأها مباشرة في المتصفح
+  if (ext === '.txt' || ext === '.md') {
+    const reader = new FileReader()
+    reader.onload = (ev) => {
+      bookFileText.value = (ev.target.result || '').slice(0, 80000)
+      bookExtractLoading.value = false
+    }
+    reader.onerror = () => {
+      bookExtractError.value = 'فشل قراءة الملف'
+      bookExtractLoading.value = false
+    }
+    reader.readAsText(file, 'utf-8')
+    return
+  }
+
+  // PDF / PPTX — نرسلهم للباك إند للاستخراج
+  try {
+    const res = await managerAPI.extractBookText(file)
+    bookFileText.value = res.data.text || ''
+    if (!bookFileText.value.trim()) {
+      bookExtractError.value = 'لم يُستخرج نص من الملف — تأكد أنه يحتوي على نص قابل للقراءة'
+      bookFileName.value = ''
+    }
+  } catch (e) {
+    bookExtractError.value = e.response?.data?.detail || 'فشل استخراج النص من الملف'
+    bookFileName.value = ''
+  } finally {
+    bookExtractLoading.value = false
+  }
+}
 
 async function loadStats() {
   statsLoading.value = true
@@ -707,18 +837,26 @@ function downloadPasswordsCSV() {
 }
 
 async function addBook() {
-  if (!newBook.value.title || !newBook.value.subject) {
-    alert('أدخل عنوان الكتاب والمادة')
+  if (!newBook.value.title?.trim() || !newBook.value.subject?.trim()) {
+    alert('أدخل عنوان الكتاب والمادة الدراسية')
     return
   }
   bookLoading.value = true
   try {
-    await managerAPI.addBook(newBook.value)
-    newBook.value = { title: '', subject: '', grade: '', raw_text: '' }
+    await managerAPI.addBook({
+      title: newBook.value.title.trim(),
+      subject: newBook.value.subject.trim(),
+      grade: newBook.value.grade?.trim() || '',
+      raw_text: bookFileText.value || ''
+    })
+    // تصفير الحقول
+    newBook.value = { title: '', subject: '', grade: '' }
+    clearBookFile()
+    // إعادة تحميل الكتب
     const res = await managerAPI.getBooks()
     books.value = res.data
   } catch (e) {
-    alert('خطأ في إضافة الكتاب')
+    alert('❌ خطأ في إضافة الكتاب: ' + (e.response?.data?.detail || e.message))
   } finally {
     bookLoading.value = false
   }

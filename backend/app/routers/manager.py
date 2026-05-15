@@ -220,6 +220,76 @@ async def get_books(
     return result.data
 
 
+@router.post("/extract-book-text")
+async def extract_book_text(
+    file: UploadFile = File(...),
+    current_user: dict = Depends(require_manager),
+):
+    """استخراج النص من ملف PDF أو PowerPoint أو TXT"""
+    filename = (file.filename or "").lower()
+    content = await file.read()
+
+    if len(content) > 15 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="الملف أكبر من 15MB")
+
+    text = ""
+
+    # ───── TXT / MD ─────
+    if filename.endswith((".txt", ".md")):
+        try:
+            text = content.decode("utf-8", errors="replace")
+        except Exception:
+            text = content.decode("latin-1", errors="replace")
+
+    # ───── PDF ─────
+    elif filename.endswith(".pdf"):
+        try:
+            from pypdf import PdfReader
+            import io as _io
+            reader = PdfReader(_io.BytesIO(content))
+            pages_text = []
+            for page in reader.pages:
+                t = page.extract_text() or ""
+                pages_text.append(t)
+            text = "\n".join(pages_text)
+        except Exception as e:
+            logger.warning(f"pypdf failed: {e}")
+            # fallback: raw decode (text-layer PDFs)
+            try:
+                text = content.decode("utf-8", errors="ignore")
+            except Exception:
+                text = ""
+
+    # ───── PPTX ─────
+    elif filename.endswith(".pptx"):
+        try:
+            from pptx import Presentation
+            import io as _io
+            prs = Presentation(_io.BytesIO(content))
+            slides_text = []
+            for slide in prs.slides:
+                slide_parts = []
+                for shape in slide.shapes:
+                    if hasattr(shape, "text") and shape.text.strip():
+                        slide_parts.append(shape.text.strip())
+                if slide_parts:
+                    slides_text.append(" | ".join(slide_parts))
+            text = "\n".join(slides_text)
+        except Exception as e:
+            logger.warning(f"pptx extraction failed: {e}")
+            text = ""
+
+    else:
+        raise HTTPException(status_code=400, detail="صيغة غير مدعومة. استخدم PDF أو PPTX أو TXT")
+
+    if not text.strip():
+        raise HTTPException(status_code=422, detail="لم يتم استخراج أي نص من الملف — تأكد أن الملف يحتوي على نص قابل للقراءة")
+
+    # تقليص النص لـ 80,000 حرف (حد Gemini المناسب)
+    text = text[:80000]
+    return {"text": text, "chars": len(text), "filename": file.filename}
+
+
 @router.post("/books")
 async def add_book(
     book_data: dict,

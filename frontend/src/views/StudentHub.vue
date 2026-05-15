@@ -397,7 +397,7 @@
           </div>
           <div v-if="vidScript" style="margin-top:20px">
             <div style="background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:20px;color:var(--text2);font-size:14px;line-height:1.8;white-space:pre-wrap" v-html="fmt(vidScript)"></div>
-            <button class="btn-s" style="margin-top:10px" @click="navigator.clipboard.writeText(vidScript)">📋 نسخ</button>
+            <button class="btn-s" style="margin-top:10px" @click="copyText(vidScript)">📋 نسخ</button>
           </div>
         </div>
       </section>
@@ -1250,6 +1250,9 @@ async function sendCpl() {
 }
 async function handleLogout() { await auth.logout(); router.push('/login') }
 
+function copyText(t) {
+  navigator.clipboard?.writeText(t).catch(() => {})
+}
 function fmt(t) {
   if(!t) return ''
   return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')

@@ -61,6 +61,11 @@ export const managerAPI = {
   exportCSV: (schoolId) => api.get(`/manager/export/${schoolId}`, { responseType: 'blob' }),
   getBooks: () => api.get('/manager/books'),
   addBook: (data) => api.post('/manager/books', data),
+  extractBookText: (file) => {
+    const fd = new FormData()
+    fd.append('file', file)
+    return api.post('/manager/extract-book-text', fd, { headers: { 'Content-Type': 'multipart/form-data' } })
+  },
   getSavedPasswords: (schoolId) => api.get(`/manager/passwords/${schoolId}`),
   // 👔 ميزات المدير المتقدمة
   strategicAdvisor: (question, context = '') => api.post('/manager/strategic-advisor', { question, context }),
