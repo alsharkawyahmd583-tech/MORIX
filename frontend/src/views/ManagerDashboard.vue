@@ -1022,7 +1022,7 @@ async function resetPassword(userId) {
   revealLoading.value[userId] = false
 }
 function copyToClipboard(text) {
-  navigator.clipboard?.writeText(text)
+  navigator.clipboard?.writeText(text).catch(() => {})
   alert('✅ تم نسخ كلمة السر')
 }
 

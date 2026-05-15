@@ -886,7 +886,7 @@ async function genImg() {
   finally { imgLoading.value=false }
 }
 
-function copyText(t) { navigator.clipboard.writeText(t).catch(()=>{}) }
+function copyText(t) { navigator.clipboard?.writeText(t).catch(()=>{}) }
 async function doLogout() { await auth.logout(); router.push('/login') }
 function fmtDate(d) { return d?new Date(d).toLocaleDateString('ar-SA'):'' }
 function fmt(t) {
