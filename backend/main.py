@@ -16,12 +16,23 @@ logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 
+# ── تحذير أمني عند استخدام JWT secret ضعيف ────────────────────────────
+_WEAK_JWT_SECRETS = {
+    "memorix-default-secret",
+    "memorix-super-secret-jwt-key-2024-change-in-production",
+    "secret", "changeme", "password", "",
+}
+if settings.jwt_secret_key in _WEAK_JWT_SECRETS:
+    logging.warning("⚠️  JWT_SECRET_KEY يستخدم قيمة افتراضية غير آمنة! غيّرها في .env قبل النشر للإنتاج.")
+
+# ── وضع الإنتاج من متغير البيئة ─────────────────────────────────────────
 _IS_PRODUCTION = os.getenv("ENVIRONMENT", "development").lower() == "production"
 
 app = FastAPI(
     title="Morix API",
     description="منصة Morix للتعلم الذكي - API",
     version=settings.app_version,
+    # إخفاء التوثيق في الإنتاج لتقليل سطح الهجوم
     docs_url=None if _IS_PRODUCTION else "/docs",
     redoc_url=None if _IS_PRODUCTION else "/redoc",
     openapi_url=None if _IS_PRODUCTION else "/openapi.json",
@@ -32,6 +43,7 @@ from fastapi.responses import JSONResponse, Response
 import traceback
 
 
+# ── Security Headers Middleware ──────────────────────────────────────────
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         response: Response = await call_next(request)
@@ -40,14 +52,6 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
         response.headers["X-XSS-Protection"] = "1; mode=block"
         response.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
-        response.headers["Content-Security-Policy"] = (
-            "default-src 'self'; "
-            "script-src 'self' 'unsafe-inline'; "
-            "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
-            "font-src 'self' https://fonts.gstatic.com; "
-            "img-src 'self' data: https:; "
-            "connect-src 'self' https:;"
-        )
         if _IS_PRODUCTION:
             response.headers["Strict-Transport-Security"] = "max-age=63072000; includeSubDomains"
         return response
@@ -57,8 +61,12 @@ app.add_middleware(SecurityHeadersMiddleware)
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
+    # لوج الخطأ الكامل في السيرفر فقط — لا نُرسل التفاصيل للعميل
     logging.error(f"Unhandled error on {request.method} {request.url.path}: {traceback.format_exc()}")
-    return JSONResponse(status_code=500, content={"detail": "حدث خطأ داخلي في الخادم. تواصل مع الدعم الفني."})
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "حدث خطأ داخلي في الخادم. تواصل مع الدعم الفني."}
+    )
 
 app.add_middleware(
     CORSMiddleware,
@@ -73,6 +81,7 @@ app.add_middleware(
         "http://127.0.0.1:5174",
     ],
     allow_credentials=True,
+    # تحديد الـ methods المسموحة فقط بدل *
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type", "Accept", "X-Requested-With"],
 )
@@ -92,8 +101,21 @@ async def health_check():
 
 
 @app.get("/api/v1/system-check")
-async def system_check():
-    """فحص شامل لمكونات المنصة — استخدمه للتشخيص"""
+async def system_check(request: Request):
+    """فحص شامل لمكونات المنصة — للمالك فقط"""
+    # التحقق من التوكن يدوياً (بدون Depends لأن الـ endpoint خارج الـ routers)
+    from fastapi.security import HTTPBearer
+    from app.auth import decode_token
+    from app.database import get_supabase
+    auth_header = request.headers.get("Authorization", "")
+    if not auth_header.startswith("Bearer "):
+        return JSONResponse(status_code=401, content={"detail": "يجب تسجيل الدخول"})
+    try:
+        payload = decode_token(auth_header.split(" ", 1)[1])
+        if payload.get("role") != "owner":
+            return JSONResponse(status_code=403, content={"detail": "هذا الفحص للمالك فقط"})
+    except Exception:
+        return JSONResponse(status_code=401, content={"detail": "رمز وصول غير صالح"})
     checks = {"timestamp": None, "checks": {}}
     from datetime import datetime, timezone
     checks["timestamp"] = datetime.now(timezone.utc).isoformat()
@@ -137,7 +159,10 @@ async def system_check():
 
 @app.get("/")
 async def root():
-    return {"message": "مرحباً بك في Morix API - منصة التعلم الذكي", "docs": "/docs", "system_check": "/api/v1/system-check"}
+    info = {"message": "مرحباً بك في Morix API - منصة التعلم الذكي", "version": settings.app_version}
+    if not _IS_PRODUCTION:
+        info["docs"] = "/docs"
+    return info
 
 
 # ============================================================
@@ -147,7 +172,6 @@ from fastapi import Request, Query
 from fastapi.responses import Response, StreamingResponse
 import httpx
 from urllib.parse import urlparse, urljoin
-from html import escape as _he
 
 ALLOWED_HOSTS = {
     "hindawi.org", "www.hindawi.org",
@@ -173,18 +197,34 @@ STRIP_HEADERS = {
 
 @app.get("/api/v1/proxy")
 async def iframe_proxy(url: str = Query(...), request: Request = None):
-    """يجيب صفحة خارجية ويحذف headers اللي بتمنع التضمين في iframe"""
+    """يجيب صفحة خارجية ويحذف headers اللي بتمنع التضمين في iframe — يتطلب تسجيل دخول"""
+    # ─── التحقق من الـ JWT ────────────────────────────────────────────
+    from app.auth import decode_token
+    auth_header = (request.headers.get("Authorization") or "") if request else ""
+    if not auth_header.startswith("Bearer "):
+        return Response(
+            content="<html dir='rtl'><body style='font-family:sans-serif;padding:24px;background:#0f172a;color:#fff'><h2>🔒 يجب تسجيل الدخول لاستخدام هذه الميزة</h2></body></html>",
+            media_type="text/html; charset=utf-8", status_code=401
+        )
+    try:
+        decode_token(auth_header.split(" ", 1)[1])
+    except Exception:
+        return Response(
+            content="<html dir='rtl'><body style='font-family:sans-serif;padding:24px;background:#0f172a;color:#fff'><h2>🔒 رمز وصول غير صالح</h2></body></html>",
+            media_type="text/html; charset=utf-8", status_code=401
+        )
+    # ─── التحقق من الـ URL ────────────────────────────────────────────
     try:
         parsed = urlparse(url)
+        # يجب أن يكون البروتوكول http أو https فقط (منع SSRF عبر file://, ftp:// إلخ)
+        if parsed.scheme not in ("http", "https"):
+            return Response(content="<html><body>بروتوكول غير مسموح</body></html>",
+                            media_type="text/html; charset=utf-8", status_code=400)
         host = (parsed.hostname or "").lower()
+        # فحص صارم: المضيف يجب أن يكون في ALLOWED_HOSTS بالضبط (بدون fallback للـ base domain)
         if host not in ALLOWED_HOSTS:
-            base_check = ".".join(host.split(".")[-2:]) if host else ""
-            if base_check not in {"hindawi.org", "noor-book.com", "shamela.ws", "openlibrary.org",
-                                   "archive.org", "gutenberg.org", "ed.gov", "wikibooks.org",
-                                   "wikipedia.org", "wikisource.org", "google.com",
-                                   "kotobati.org", "wdl.org"}:
-                return Response(content=f"<html dir='rtl'><body style='font-family:sans-serif;padding:24px;background:#0f172a;color:#fff'><h2>🚫 هذا الموقع غير مدعوم في البروكسي</h2><p>{_he(host)}</p><p><a style='color:#6366f1' href='{_he(url)}' target='_blank'>افتح الموقع في تبويب جديد</a></p></body></html>",
-                                media_type="text/html; charset=utf-8")
+            return Response(content=f"<html dir='rtl'><body style='font-family:sans-serif;padding:24px;background:#0f172a;color:#fff'><h2>🚫 هذا الموقع غير مدعوم في البروكسي</h2><p>{host}</p><p><a style='color:#6366f1' href='{url}' target='_blank'>افتح الموقع في تبويب جديد</a></p></body></html>",
+                            media_type="text/html; charset=utf-8")
         async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
             ua = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36"
             r = await client.get(url, headers={"User-Agent": ua, "Accept-Language": "ar,en;q=0.8"})
@@ -230,7 +270,7 @@ async def iframe_proxy(url: str = Query(...), request: Request = None):
     except Exception as e:
         logging.error(f"Proxy failed: {e}")
         return Response(
-            content=f"<html dir='rtl'><body style='font-family:sans-serif;padding:24px;background:#0f172a;color:#fff'><h2>⚠️ تعذر تحميل الصفحة</h2><p>{_he(str(e)[:200])}</p><p><a style='color:#6366f1' href='{_he(url)}' target='_blank'>افتح الرابط مباشرة</a></p></body></html>",
+            content=f"<html dir='rtl'><body style='font-family:sans-serif;padding:24px;background:#0f172a;color:#fff'><h2>⚠️ تعذر تحميل الصفحة</h2><p>{str(e)[:200]}</p><p><a style='color:#6366f1' href='{url}' target='_blank'>افتح الرابط مباشرة</a></p></body></html>",
             media_type="text/html; charset=utf-8",
             status_code=200,
         )

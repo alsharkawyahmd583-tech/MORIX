@@ -1,5 +1,5 @@
 # توليد الحسابات تلقائياً
-import secrets
+import random
 import string
 from typing import List
 from app.config import settings
@@ -10,7 +10,7 @@ import re
 def generate_password(length: int = 10) -> str:
     """توليد كلمة مرور عشوائية"""
     chars = string.ascii_letters + string.digits
-    return ''.join(secrets.choice(chars) for _ in range(length))
+    return ''.join(random.choices(chars, k=length))
 
 
 def normalize_arabic_name(name: str) -> str:
