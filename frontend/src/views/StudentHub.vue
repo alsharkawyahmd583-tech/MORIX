@@ -1,6 +1,5 @@
 <template>
-  <div class="hub hub-student">
-    <MatrixBackground />
+  <div class="hub">
 
     <!-- Mobile menu button -->
     <button class="mobile-toggle" @click="mobileOpen = !mobileOpen" aria-label="Menu">
@@ -20,7 +19,7 @@
         <button v-for="sec in sections" :key="sec.id"
           :class="['nav-item', { active: currentSection === sec.id }]"
           @click="switchSection(sec.id)" :title="sec.label">
-          <span class="nav-icon" v-html="sec.svg"></span>
+          <span class="nav-icon">{{ sec.icon }}</span>
           <span v-if="!sidebarCollapsed" class="nav-label">{{ sec.label }}</span>
         </button>
       </nav>
@@ -31,22 +30,20 @@
         </div>
         <div v-else class="streak-mini">🔥{{ profile.streak_count || 0 }}</div>
         <button class="logout-btn" @click="handleLogout">
-          <span>🚪</span><span v-if="!sidebarCollapsed">{{ t('logout_btn') }}</span>
+          <span>🚪</span><span v-if="!sidebarCollapsed">خروج</span>
         </button>
       </div>
     </aside>
 
     <!-- Main -->
     <main class="main-content">
-      <NavBar
-        :title="currentSectionLabel"
-        :name="firstName"
-        :avatar-url="appSettings.avatar_url"
-        :current-theme="appSettings.theme"
-        :current-lang="lang"
-        @theme="t => { appSettings.theme = t; saveSettings() }"
-        @lang="changeStudentLang"
-      />
+      <header class="top-bar">
+        <h2 class="section-title">{{ currentSectionLabel }}</h2>
+        <div class="user-chip">
+          <div class="avatar">{{ firstName[0] || '?' }}</div>
+          <span>{{ firstName }}</span>
+        </div>
+      </header>
 
       <!-- ===== CHAT ===== -->
       <section v-show="currentSection === 'chat'" class="section-body">
@@ -68,7 +65,7 @@
         <!-- Chat UI -->
         <div v-else class="chat-layout">
           <div class="conv-panel">
-            <button class="new-conv-btn" @click="startNewConv">{{ t('new_chat') }}</button>
+            <button class="new-conv-btn" @click="startNewConv">+ محادثة جديدة</button>
             <div class="conv-list">
               <div v-for="c in conversations" :key="c.id"
                 :class="['conv-item', { active: currentConvId === c.id }]"
@@ -76,12 +73,12 @@
                 <span class="conv-title">{{ c.title }}</span>
                 <button class="del-conv" @click.stop="deleteConv(c.id)">✕</button>
               </div>
-              <p v-if="!conversations.length" class="no-conv">{{ t('no_conversations') }}</p>
+              <p v-if="!conversations.length" class="no-conv">لا توجد محادثات</p>
             </div>
             <div class="book-sel">
-              <label>{{ t('book_label') }}</label>
+              <label>📖 كتاب:</label>
               <select v-model="selectedBookId">
-                <option value="">{{ t('no_book') }}</option>
+                <option value="">بدون</option>
                 <option v-for="b in books" :key="b.id" :value="b.id">{{ b.title }}</option>
               </select>
             </div>
@@ -92,7 +89,7 @@
               <div v-if="!messages.length" class="chat-welcome">
                 <div style="font-size:52px;margin-bottom:14px">🤖</div>
                 <h3>مرحباً {{ firstName }}!</h3>
-                <p>{{ t('how_can_i_help') }}</p>
+                <p>كيف يمكنني مساعدتك اليوم؟</p>
                 <div class="quick-btns">
                   <button v-for="q in quickQs" :key="q" class="quick-btn" @click="sendMsg(q)">{{ q }}</button>
                 </div>
@@ -110,45 +107,17 @@
                 </div>
               </div>
             </div>
-            <!-- Quick gen bar -->
-            <div v-if="chatGenMode" class="chat-gen-bar">
-              <div v-if="chatGenMode==='image'" class="chat-gen-inner">
-                <span class="gen-label">🖼️ توليد صورة</span>
-                <input v-model="chatImgPrompt" class="gen-input" placeholder="صِف الصورة التي تريدها..." @keydown.enter.prevent="doChatGenImage" />
-                <button class="gen-go" @click="doChatGenImage" :disabled="!chatImgPrompt.trim() || chatGenLoading">
-                  {{ chatGenLoading ? '⏳' : '✨ ولّد' }}
-                </button>
-                <button class="gen-close" @click="chatGenMode=null">✕</button>
-              </div>
-              <div v-if="chatGenMode==='video'" class="chat-gen-inner">
-                <span class="gen-label">🎬 فيديو</span>
-                <input v-model="vidTopic" class="gen-input" placeholder="موضوع الفيديو..." @keydown.enter.prevent="doChatGenVideo" />
-                <input v-model="vidSubject" class="gen-input" placeholder="المادة..." style="max-width:120px" />
-                <button class="gen-go" @click="doChatGenVideo" :disabled="!vidTopic.trim() || vidLoading">
-                  {{ vidLoading ? '⏳' : '✨ ولّد' }}
-                </button>
-                <button class="gen-close" @click="chatGenMode=null">✕</button>
-              </div>
-            </div>
-
             <div class="input-row">
-              <input type="file" ref="fileInputEl" accept="image/*,.pdf,.txt,.md,.pptx,.docx" @change="onFileAttach" style="display:none" />
+              <input type="file" ref="fileInputEl" accept="image/*,.pdf,.txt" @change="onFileAttach" style="display:none" />
               <button class="attach-btn" @click="fileInputEl.click()" title="إرفاق صورة أو ملف">📎</button>
-              <button class="attach-btn" @click="chatGenMode = chatGenMode==='image'?null:'image'" :class="{active:chatGenMode==='image'}" title="توليد صورة">🖼️</button>
-              <button class="attach-btn" @click="chatGenMode = chatGenMode==='video'?null:'video'" :class="{active:chatGenMode==='video'}" title="توليد فيديو">🎬</button>
               <div v-if="attachedFile" class="attach-chip">
                 {{ attachedFile.name.slice(0,20) }}
                 <button @click="clearAttach" style="background:none;border:none;cursor:pointer;color:var(--text2)">✕</button>
               </div>
-              <div v-if="genImg" class="attach-chip" style="gap:6px">
-                <img :src="'data:image/png;base64,'+genImg" style="width:24px;height:24px;border-radius:4px;object-fit:cover" />
-                <span>صورة</span>
-                <button @click="genImg=null" style="background:none;border:none;cursor:pointer;color:var(--text2)">✕</button>
-              </div>
               <textarea v-model="chatInput" rows="2" :placeholder="attachedFile?'أضف رسالة (اختياري)...':'اكتب سؤالك...'"
                 @keydown.enter.exact.prevent="sendMsg()"
                 @keydown.enter.shift.exact="chatInput += '\n'"></textarea>
-              <button class="send-btn" @click="sendMsg()" :disabled="(!chatInput.trim()&&!attachedFile&&!genImg) || aiThinking">➤</button>
+              <button class="send-btn" @click="sendMsg()" :disabled="(!chatInput.trim()&&!attachedFile) || aiThinking">➤</button>
             </div>
           </div>
         </div>
@@ -157,25 +126,25 @@
       <!-- ===== BOOK SUMMARY ===== -->
       <section v-show="currentSection === 'books'" class="section-body pad">
         <div class="card">
-          <h3>📖 {{ t('books') }}</h3>
+          <h3>📖 ملخص الكتاب</h3>
           <div class="row-gap">
             <select v-model="summaryBookId" class="inp">
-              <option value="">{{ t('select_book') }}</option>
+              <option value="">اختر كتاباً...</option>
               <option v-for="b in books" :key="b.id" :value="b.id">{{ b.title }} — {{ b.subject }}</option>
             </select>
             <button class="btn-p" @click="loadSummary" :disabled="!summaryBookId || summaryLoading">
-              {{ summaryLoading ? '...' : t('summarize_book') }}
+              {{ summaryLoading ? '...' : 'جلب الملخص' }}
             </button>
           </div>
           <div v-if="bookSummary" class="summary-box">
             <div class="summary-acts">
-              <button class="btn-s" @click="speakSummary">{{ isSpeaking ? '⏸ ' + t('stop_audio') : '🔊 ' + t('listen_btn') }}</button>
+              <button class="btn-s" @click="speakSummary">{{ isSpeaking ? '⏸ إيقاف' : '🔊 استمع' }}</button>
               <button v-if="isSpeaking" class="btn-s danger" @click="stopSpeech">⏹</button>
             </div>
             <p class="summary-text">{{ bookSummary }}</p>
           </div>
           <div v-if="summaryBookId && bookSummary" style="margin-top:20px">
-            <h4 style="color:var(--text);margin:0 0 12px">💬 {{ t('ask_about_book') }}</h4>
+            <h4 style="color:var(--text);margin:0 0 12px">💬 اسأل عن الكتاب</h4>
             <div class="messages mini" ref="bookMsgsEl">
               <div v-for="(msg,i) in bookMessages" :key="i" :class="['msg',msg.role]">
                 <div class="msg-bubble">
@@ -195,21 +164,21 @@
       <!-- ===== GAMES ===== -->
       <section v-show="currentSection === 'games'" class="section-body pad">
         <div v-if="!activeGame" class="card">
-          <h3>🎮 {{ t('educational_games') }}</h3>
+          <h3>🎮 الألعاب التعليمية</h3>
           <div class="col-gap">
             <select v-model="gameType" class="inp">
-              <option value="mcq">✅ {{ t('multiple_choice') }}</option>
-              <option value="matching">🔗 {{ t('matching') }}</option>
-              <option value="flashcards">📇 {{ t('flashcards_label') }}</option>
+              <option value="mcq">✅ اختيار من متعدد</option>
+              <option value="matching">🔗 مطابقة المصطلحات</option>
+              <option value="flashcards">📇 بطاقات تعليمية</option>
             </select>
             <input v-model="gameSubject" class="inp" placeholder="المادة (مثال: الرياضيات)" />
             <input v-model="gameTopic" class="inp" placeholder="الموضوع (اختياري)" />
             <button class="btn-p" @click="startGame" :disabled="gameLoading || !gameSubject">
-              {{ gameLoading ? '⏳ ' + t('generating') : '🚀 ' + t('start_game') }}
+              {{ gameLoading ? '⏳ جاري التوليد...' : '🚀 ابدأ اللعبة' }}
             </button>
           </div>
           <div v-if="pastGames.length" style="margin-top:20px;border-top:1px solid var(--border);padding-top:16px">
-            <p style="color:var(--text2);font-size:13px;margin:0 0 10px">{{ t('past_games') }}:</p>
+            <p style="color:var(--text2);font-size:13px;margin:0 0 10px">ألعابي السابقة:</p>
             <div v-for="g in pastGames.slice(0,5)" :key="g.id"
               style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);color:var(--text2);font-size:13px">
               <span>{{ g.game_type==='mcq'?'✅':g.game_type==='matching'?'🔗':'📇' }} {{ g.subject }}</span>
@@ -234,14 +203,14 @@
             <div v-if="mcqAnswered" class="expl">
               <p>{{ mcqSel===activeGame.items[mcqIdx].answer?'✅ صحيح!':'❌ خطأ!' }}</p>
               <p style="color:var(--text2);font-size:13px">{{ activeGame.items[mcqIdx].explanation }}</p>
-              <button class="btn-p" @click="mcqNext">{{ mcqIdx<activeGame.items.length-1?t('next_btn'):t('finish_btn') }}</button>
+              <button class="btn-p" @click="mcqNext">{{ mcqIdx<activeGame.items.length-1?'التالي ▶':'إنهاء 🏁' }}</button>
             </div>
           </div>
           <div v-else class="result-box">
             <div style="font-size:48px">🏆</div>
             <h2>{{ gameScore }}%</h2>
-            <p>{{ gameScore>=80?t('excellent'):gameScore>=60?t('good_keep_going'):t('try_again') }}</p>
-            <button class="btn-p" @click="resetGame">🔄 {{ t('retry_btn') }}</button>
+            <p>{{ gameScore>=80?'ممتاز!':gameScore>=60?'جيد! استمر!':'حاول مرة أخرى!' }}</p>
+            <button class="btn-p" @click="resetGame">🔄 إعادة</button>
           </div>
         </div>
 
@@ -292,7 +261,7 @@
         <div class="card">
           <h3>📚 الواجبات</h3>
           <div v-if="hwLoading" class="empty">⏳ تحميل...</div>
-          <div v-else-if="!homework.length" class="empty">📭 {{ t('no_homework') }}</div>
+          <div v-else-if="!homework.length" class="empty">📭 لا توجد واجبات حالياً</div>
           <div v-else class="list-col">
             <div v-for="hw in homework" :key="hw.id" class="list-item">
               <div style="flex:1">
@@ -304,7 +273,7 @@
                   <span v-if="hw.due_date">📅 {{ fmtDate(hw.due_date) }}</span>
                 </div>
               </div>
-              <button class="btn-s" @click="openHwSubmit(hw)">{{ t('submit_btn') }} ✏️</button>
+              <button class="btn-s" @click="openHwSubmit(hw)">تسليم ✏️</button>
             </div>
           </div>
         </div>
@@ -325,14 +294,14 @@
         <div v-if="!activeTest" class="card">
           <h3>📝 الاختبارات</h3>
           <div v-if="testsLoading" class="empty">⏳ تحميل...</div>
-          <div v-else-if="!tests.length" class="empty">📭 {{ t('no_tests') }}</div>
+          <div v-else-if="!tests.length" class="empty">📭 لا توجد اختبارات</div>
           <div v-else class="list-col">
             <div v-for="t in tests" :key="t.id" class="list-item">
               <div style="flex:1">
                 <h4>{{ t.title }}</h4>
                 <div class="meta-row"><span>📚 {{ t.subject }}</span><span>⏱ {{ t.duration_minutes }}د</span></div>
               </div>
-              <button class="btn-p" @click="startTest(t.id)">{{ t('start_btn') }}</button>
+              <button class="btn-p" @click="startTest(t.id)">ابدأ</button>
             </div>
           </div>
         </div>
@@ -351,7 +320,7 @@
             <div class="test-nav">
               <button class="btn-s" @click="tQIdx--" :disabled="tQIdx===0">◀</button>
               <button v-if="tQIdx<(activeTest.questions?.length||1)-1" class="btn-s" @click="tQIdx++">▶</button>
-              <button v-else class="btn-p" @click="doSubmitTest">{{ t('finish_btn') }}</button>
+              <button v-else class="btn-p" @click="doSubmitTest">إنهاء 🏁</button>
             </div>
           </div>
           <div v-else class="result-box">
@@ -367,7 +336,7 @@
         <div class="card">
           <h3>📋 أوراق العمل</h3>
           <div v-if="wsLoading" class="empty">⏳ تحميل...</div>
-          <div v-else-if="!worksheets.length" class="empty">📭 {{ t('no_worksheets') }}</div>
+          <div v-else-if="!worksheets.length" class="empty">📭 لا توجد أوراق عمل</div>
           <div v-else class="list-col">
             <div v-for="ws in worksheets" :key="ws.id" class="list-item clickable" @click="openWs(ws.id)">
               <div style="flex:1">
@@ -399,13 +368,13 @@
             <textarea v-model="imgPrompt" class="inp" rows="3"
               placeholder="مثال: مخطط يوضح دورة الماء في الطبيعة..."></textarea>
             <button class="btn-p" @click="genImage" :disabled="imgLoading || !imgPrompt.trim()">
-              {{ imgLoading ? '⏳ ' + t('generating') : '✨ ' + t('generate_image') }}
+              {{ imgLoading ? '⏳ جاري التوليد...' : '✨ توليد الصورة' }}
             </button>
           </div>
           <div v-if="imgError" style="color:#f87171;font-size:13px;margin-top:12px">{{ imgError }}</div>
           <div v-if="genImg" style="margin-top:20px;text-align:center">
             <img :src="`data:image/png;base64,${genImg}`" style="max-width:100%;border-radius:12px;border:2px solid var(--border)" />
-            <br><a :href="`data:image/png;base64,${genImg}`" download="morix.png" class="btn-s" style="margin-top:10px;display:inline-block">⬇ {{ t('download_btn') }}</a>
+            <br><a :href="`data:image/png;base64,${genImg}`" download="morix.png" class="btn-s" style="margin-top:10px;display:inline-block">⬇ تحميل</a>
           </div>
         </div>
       </section>
@@ -415,7 +384,7 @@
         <div class="card">
           <h3>🎬 توليد سكريبت الفيديو</h3>
           <div class="col-gap">
-            <input v-model="vidTopic" class="inp" :placeholder="t('video_topic')" />
+            <input v-model="vidTopic" class="inp" placeholder="موضوع الفيديو" />
             <input v-model="vidSubject" class="inp" placeholder="المادة الدراسية" />
             <div>
               <p style="color:var(--text2);font-size:13px;margin:0 0 6px">المدة: {{ formatVidDur(vidSeconds) }}</p>
@@ -423,12 +392,12 @@
               <div style="display:flex;justify-content:space-between;color:var(--text2);font-size:12px;margin-top:4px"><span>30 ثانية</span><span>10 دقائق</span></div>
             </div>
             <button class="btn-p" @click="genVideo" :disabled="vidLoading||!vidTopic">
-              {{ vidLoading ? '⏳ ...' : '✍️ ' + t('generate_script') }}
+              {{ vidLoading ? '⏳ ...' : '✍️ توليد السكريبت' }}
             </button>
           </div>
           <div v-if="vidScript" style="margin-top:20px">
             <div style="background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:20px;color:var(--text2);font-size:14px;line-height:1.8;white-space:pre-wrap" v-html="fmt(vidScript)"></div>
-            <button class="btn-s" style="margin-top:10px" @click="copyText(vidScript)">📋 {{ t('copy_btn') }}</button>
+            <button class="btn-s" style="margin-top:10px" @click="copyText(vidScript)">📋 نسخ</button>
           </div>
         </div>
       </section>
@@ -436,8 +405,8 @@
       <!-- ===== 🏆 LEADERBOARD ===== -->
       <section v-show="currentSection === 'leaderboard'" class="section-body pad">
         <div class="card">
-          <h3 style="margin-bottom:16px">🏆 {{ t('school_heroes') }}</h3>
-          <div v-if="!leaderboard.length" style="color:var(--text2);text-align:center;padding:32px">{{ t('loading') }}</div>
+          <h3 style="margin-bottom:16px">🏆 أبطال مدرستك — أفضل 10 طلاب</h3>
+          <div v-if="!leaderboard.length" style="color:var(--text2);text-align:center;padding:32px">جاري التحميل...</div>
           <div v-for="u in leaderboard" :key="u.id"
                :style="{display:'flex',alignItems:'center',gap:12,padding:'12px',marginBottom:'8px',borderRadius:'12px',background:u.is_me?'linear-gradient(90deg,rgba(99,102,241,.25),transparent)':'var(--card)',border:u.is_me?'2px solid var(--accent)':'1px solid var(--border)'}">
             <div style="font-size:24px;font-weight:bold;width:40px;text-align:center">
@@ -451,7 +420,7 @@
               {{ (u.full_name||'?').charAt(0) }}
             </div>
             <div style="flex:1">
-              <div style="font-weight:bold;color:var(--text)">{{ u.full_name }} <span v-if="u.is_me" style="font-size:12px;color:var(--accent)">{{ t('you_label') }}</span></div>
+              <div style="font-weight:bold;color:var(--text)">{{ u.full_name }} <span v-if="u.is_me" style="font-size:12px;color:var(--accent)">(أنت)</span></div>
               <div style="font-size:12px;color:var(--text2)">{{ u.grade }}</div>
             </div>
             <div style="text-align:left">
@@ -466,11 +435,11 @@
       <section v-show="currentSection === 'daily'" class="section-body pad">
         <div class="card" style="max-width:600px;margin:0 auto">
           <h3 style="margin-bottom:16px">🎯 التحدي اليومي</h3>
-          <div v-if="dailyState==='loading'" style="text-align:center;color:var(--text2);padding:32px">{{ t('loading') }}</div>
+          <div v-if="dailyState==='loading'" style="text-align:center;color:var(--text2);padding:32px">جاري التحميل...</div>
           <div v-else-if="dailyState==='answered'" style="text-align:center;padding:32px">
             <div style="font-size:64px">✅</div>
-            <h3 style="margin:12px 0">{{ t('answered_challenge') }}</h3>
-            <p style="color:var(--text2)">{{ t('come_back_tomorrow') }}</p>
+            <h3 style="margin:12px 0">أجبت على تحدي اليوم!</h3>
+            <p style="color:var(--text2)">عد غداً لتحدي جديد 🌅</p>
             <p style="color:#fbbf24;margin-top:12px">⭐ كسبت {{ dailyResult?.stars_earned || 0 }} نجمة</p>
           </div>
           <div v-else-if="dailyState==='ready' && dailyChallenge?.question">
@@ -503,13 +472,13 @@
             {{ pomoDisplay }}
           </div>
           <div style="margin:12px 0;color:var(--text2)">
-            {{ pomoMode==='work' ? '🎯 ' + t('focus_time') : '☕ ' + t('break_time') }}
+            {{ pomoMode==='work' ? '🎯 وقت التركيز' : '☕ استراحة' }}
             — جلسة #{{ pomoSessions+1 }}
           </div>
           <div style="display:flex;gap:8px;justify-content:center;margin-top:16px">
-            <button @click="startPomo" v-if="!pomoRunning" class="btn-primary">▶️ {{ t('start_btn') }}</button>
-            <button @click="pausePomo" v-else class="btn-primary">⏸️ {{ t('pause_btn') }}</button>
-            <button @click="resetPomo" class="btn-primary" style="background:var(--bg3)">🔄 {{ t('reset_btn') }}</button>
+            <button @click="startPomo" v-if="!pomoRunning" class="btn-primary">▶️ ابدأ</button>
+            <button @click="pausePomo" v-else class="btn-primary">⏸️ إيقاف</button>
+            <button @click="resetPomo" class="btn-primary" style="background:var(--bg3)">🔄 تصفير</button>
           </div>
           <div v-if="pomoMessage" style="margin-top:16px;color:#fbbf24">{{ pomoMessage }}</div>
         </div>
@@ -518,7 +487,7 @@
       <!-- ===== 😊 MOOD ===== -->
       <section v-show="currentSection === 'mood'" class="section-body pad">
         <div class="card" style="max-width:600px;margin:0 auto">
-          <h3 style="margin-bottom:16px">😊 {{ t('how_feeling') }}</h3>
+          <h3 style="margin-bottom:16px">😊 كيف تشعر اليوم؟</h3>
           <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px">
             <button v-for="m in moods" :key="m.key"
                     @click="logMood(m.key)"
@@ -528,20 +497,8 @@
               <div style="margin-top:8px;color:var(--text)">{{ m.label }}</div>
             </button>
           </div>
-          <div v-if="moodSuggestion" style="padding:16px;background:linear-gradient(135deg,rgba(99,102,241,.15),rgba(99,102,241,.05));border-radius:12px;border:1px solid var(--accent);color:var(--text);margin-bottom:20px">
+          <div v-if="moodSuggestion" style="padding:16px;background:linear-gradient(135deg,rgba(99,102,241,.15),rgba(99,102,241,.05));border-radius:12px;border:1px solid var(--accent);color:var(--text)">
             {{ moodSuggestion }}
-          </div>
-          <!-- سجل المزاجية آخر 7 أيام -->
-          <div v-if="moodHistory.length" style="margin-top:8px">
-            <h4 style="color:var(--text2);font-size:13px;margin-bottom:10px">📅 آخر 7 أيام</h4>
-            <div style="display:flex;flex-direction:column;gap:8px">
-              <div v-for="entry in moodHistory" :key="entry.created_at"
-                   style="display:flex;align-items:center;gap:12px;padding:10px 14px;background:var(--bg2);border-radius:10px">
-                <span style="font-size:22px">{{ moods.find(m=>m.key===entry.event_data?.mood)?.emoji || '😐' }}</span>
-                <span style="flex:1;color:var(--text)">{{ moods.find(m=>m.key===entry.event_data?.mood)?.label || entry.event_data?.mood }}</span>
-                <span style="color:var(--text2);font-size:12px">{{ new Date(entry.created_at).toLocaleDateString('ar-EG') }}</span>
-              </div>
-            </div>
           </div>
         </div>
       </section>
@@ -552,9 +509,9 @@
           <h3 style="margin-bottom:8px">🌅 التأمل اليومي</h3>
           <p style="color:var(--text2);margin-bottom:16px">ماذا تعلمت اليوم؟ ما هو أفضل جزء من يومك الدراسي؟</p>
           <textarea v-model="reflectionText" rows="6" class="memorix-input"
-                    :placeholder="t('write_reflection')" style="width:100%;resize:vertical"></textarea>
+                    placeholder="اكتب تأملك هنا..." style="width:100%;resize:vertical"></textarea>
           <button @click="saveReflection" :disabled="!reflectionText.trim()" class="btn-primary" style="margin-top:12px">
-            💾 {{ t('save_stars') }}
+            💾 احفظ + 3 نجوم
           </button>
           <div v-if="reflectionMessage" style="margin-top:12px;color:#fbbf24">{{ reflectionMessage }}</div>
         </div>
@@ -563,7 +520,7 @@
       <!-- ===== 📚 DIGITAL LIBRARY (داخل المنصة عبر الـ proxy) ===== -->
       <section v-show="currentSection === 'library'" class="section-body pad">
         <div class="card">
-          <h3 style="margin-bottom:8px">📚 {{ t('free_library') }}</h3>
+          <h3 style="margin-bottom:8px">📚 المكتبة الرقمية المجانية</h3>
           <p style="color:var(--text2);margin-bottom:12px">آلاف الكتب العربية والمراجع التعليمية مجانية — يفتح داخل المنصة</p>
           <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
             <button v-for="src in libSources" :key="src.url"
@@ -592,15 +549,15 @@
           <p style="color:var(--text2);margin-bottom:12px">ارفع كتابك أو مذكراتك واسأل AI عنها، أو ولّد ملخصاً/خريطة ذهنية/أسئلة مراجعة</p>
 
           <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
-            <button @click="nbTab='upload'" class="btn-primary" :style="{background:nbTab==='upload'?'var(--accent)':'var(--bg3)',padding:'8px 14px',fontSize:'13px'}">📤 {{ t('upload_file') }}</button>
-            <button @click="nbTab='ask'" :disabled="!nbFileText" class="btn-primary" :style="{background:nbTab==='ask'?'var(--accent)':'var(--bg3)',padding:'8px 14px',fontSize:'13px',opacity:nbFileText?1:0.5}">💬 {{ t('ask_about_file') }}</button>
-            <button @click="nbTab='generate'" :disabled="!nbFileText" class="btn-primary" :style="{background:nbTab==='generate'?'var(--accent)':'var(--bg3)',padding:'8px 14px',fontSize:'13px',opacity:nbFileText?1:0.5}">✨ {{ t('generate_content') }}</button>
+            <button @click="nbTab='upload'" class="btn-primary" :style="{background:nbTab==='upload'?'var(--accent)':'var(--bg3)',padding:'8px 14px',fontSize:'13px'}">📤 رفع ملف</button>
+            <button @click="nbTab='ask'" :disabled="!nbFileText" class="btn-primary" :style="{background:nbTab==='ask'?'var(--accent)':'var(--bg3)',padding:'8px 14px',fontSize:'13px',opacity:nbFileText?1:0.5}">💬 اسأل عن الملف</button>
+            <button @click="nbTab='generate'" :disabled="!nbFileText" class="btn-primary" :style="{background:nbTab==='generate'?'var(--accent)':'var(--bg3)',padding:'8px 14px',fontSize:'13px',opacity:nbFileText?1:0.5}">✨ ولّد محتوى</button>
           </div>
 
           <div v-if="nbTab==='upload'" class="card" style="background:var(--card)">
-            <input ref="nbFileInput" type="file" accept=".pdf,.txt,.md,.pptx,.docx" @change="onNbFileUpload" style="display:none" />
+            <input ref="nbFileInput" type="file" accept=".pdf,.txt,.md" @change="onNbFileUpload" style="display:none" />
             <button @click="$refs.nbFileInput?.click()" class="btn-primary" style="width:100%;padding:24px;font-size:16px">
-              📤 اختر ملف PDF / PPTX / DOCX / TXT / MD
+              📤 اختر ملف PDF / TXT / MD
             </button>
             <div v-if="nbFileName" style="margin-top:12px;padding:12px;background:var(--bg3);border-radius:8px;border:1px solid var(--accent)">
               ✅ <b>{{ nbFileName }}</b> — جاهز ({{ Math.round(nbFileText.length/1000) }}K حرف)
@@ -624,14 +581,14 @@
 
           <div v-if="nbTab==='generate'" class="card" style="background:var(--card)">
             <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;margin-bottom:12px">
-              <button @click="genNb('summary')" :disabled="nbGenLoading" class="btn-primary">📝 {{ t('comprehensive_summary') }}</button>
-              <button @click="genNb('mindmap')" :disabled="nbGenLoading" class="btn-primary">🧠 {{ t('mind_map') }}</button>
-              <button @click="genNb('questions')" :disabled="nbGenLoading" class="btn-primary">❓ 10 {{ t('review_questions') }}</button>
-              <button @click="genNb('flashcards')" :disabled="nbGenLoading" class="btn-primary">🎴 {{ t('flashcards_label') }}</button>
-              <button @click="genNb('podcast')" :disabled="nbGenLoading" class="btn-primary">🎙️ {{ t('podcast_script') }}</button>
-              <button @click="genNb('keypoints')" :disabled="nbGenLoading" class="btn-primary">🎯 {{ t('key_points') }}</button>
+              <button @click="genNb('summary')" :disabled="nbGenLoading" class="btn-primary">📝 ملخص شامل</button>
+              <button @click="genNb('mindmap')" :disabled="nbGenLoading" class="btn-primary">🧠 خريطة ذهنية</button>
+              <button @click="genNb('questions')" :disabled="nbGenLoading" class="btn-primary">❓ 10 أسئلة مراجعة</button>
+              <button @click="genNb('flashcards')" :disabled="nbGenLoading" class="btn-primary">🎴 بطاقات تعليمية</button>
+              <button @click="genNb('podcast')" :disabled="nbGenLoading" class="btn-primary">🎙️ سكربت بودكاست</button>
+              <button @click="genNb('keypoints')" :disabled="nbGenLoading" class="btn-primary">🎯 النقاط الجوهرية</button>
             </div>
-            <div v-if="nbGenLoading" style="text-align:center;padding:20px;color:var(--text2)">⏳ {{ t('generating') }}</div>
+            <div v-if="nbGenLoading" style="text-align:center;padding:20px;color:var(--text2)">⏳ جاري التوليد...</div>
             <div v-if="nbGenResult" style="padding:16px;background:var(--bg3);border-radius:8px;white-space:pre-wrap;line-height:1.8;max-height:60vh;overflow-y:auto">{{ nbGenResult }}</div>
           </div>
         </div>
@@ -640,19 +597,19 @@
       <!-- ===== PROGRESS ===== -->
       <section v-show="currentSection === 'progress'" class="section-body pad">
         <div class="stats-grid">
-          <div class="stat-card"><div class="stat-n">🔥 {{ prog.streak||0 }}</div><div class="stat-l">{{ t('consecutive_days') }}</div></div>
-          <div class="stat-card"><div class="stat-n">⭐ {{ prog.total_stars||0 }}</div><div class="stat-l">{{ t('total_stars') }}</div></div>
-          <div class="stat-card"><div class="stat-n">💬 {{ prog.total_conversations||0 }}</div><div class="stat-l">{{ t('ai_conversations') }}</div></div>
-          <div class="stat-card"><div class="stat-n">🎮 {{ prog.total_games_played||0 }}</div><div class="stat-l">{{ t('completed_games') }}</div></div>
+          <div class="stat-card"><div class="stat-n">🔥 {{ prog.streak||0 }}</div><div class="stat-l">أيام متتالية</div></div>
+          <div class="stat-card"><div class="stat-n">⭐ {{ prog.total_stars||0 }}</div><div class="stat-l">إجمالي النجوم</div></div>
+          <div class="stat-card"><div class="stat-n">💬 {{ prog.total_conversations||0 }}</div><div class="stat-l">محادثات AI</div></div>
+          <div class="stat-card"><div class="stat-n">🎮 {{ prog.total_games_played||0 }}</div><div class="stat-l">ألعاب مكتملة</div></div>
           <div class="stat-card"><div class="stat-n">📝 {{ prog.avg_test_score||0 }}%</div><div class="stat-l">متوسط الاختبارات</div></div>
           <div class="stat-card"><div class="stat-n">🏆 {{ prog.longest_streak||0 }}</div><div class="stat-l">أطول سلسلة</div></div>
         </div>
         <div class="card" style="margin-top:16px">
-          <h3>🧠 {{ t('learning_style') }}</h3>
+          <h3>🧠 أسلوب التعلم</h3>
           <div style="font-size:20px;color:var(--text)">
-            <span v-if="profile.learning_style==='visual'">👁️ {{ t('visual') }}</span>
-            <span v-else-if="profile.learning_style==='auditory'">👂 {{ t('auditory') }}</span>
-            <span v-else-if="profile.learning_style==='kinesthetic'">✋ {{ t('kinesthetic') }}</span>
+            <span v-if="profile.learning_style==='visual'">👁️ بصري</span>
+            <span v-else-if="profile.learning_style==='auditory'">👂 سمعي</span>
+            <span v-else-if="profile.learning_style==='kinesthetic'">✋ حركي</span>
             <span v-else style="color:var(--text2);font-size:14px">لم يتحدد — أكمل الاختبار من قسم المحادثة</span>
           </div>
         </div>
@@ -664,26 +621,15 @@
           <div class="card">
             <h3>👤 معلومات الحساب</h3>
             <div class="avatar-section">
-              <div>
-                <svg v-if="appSettings.avatar_url && avatarMap[appSettings.avatar_url]" viewBox="0 0 80 80" width="64" height="64">
-                  <circle cx="40" cy="40" r="38" :fill="avatarMap[appSettings.avatar_url].bg"/>
-                  <circle cx="40" cy="32" r="16" :fill="avatarMap[appSettings.avatar_url].skin"/>
-                  <ellipse cx="40" cy="62" rx="22" ry="16" :fill="avatarMap[appSettings.avatar_url].outfit"/>
-                  <path :d="avatarMap[appSettings.avatar_url].hair" :fill="avatarMap[appSettings.avatar_url].hairColor"/>
-                </svg>
+              <div style="position:relative;cursor:pointer" @click="avatarInputEl?.click()">
+                <img v-if="appSettings.avatar_url" :src="appSettings.avatar_url" class="av-preview" />
                 <div v-else class="av-big">{{ firstName[0] }}</div>
+                <div class="av-overlay">📷</div>
               </div>
-            </div>
-            <div class="avatar-grid">
-              <div v-for="av in avatarOptions" :key="av.id"
-                   class="avatar-option" :class="{ selected: appSettings.avatar_url === av.id }"
-                   @click="selectAvatar(av.id)">
-                <svg viewBox="0 0 80 80" width="56" height="56">
-                  <circle cx="40" cy="40" r="38" :fill="av.bg"/>
-                  <circle cx="40" cy="32" r="16" :fill="av.skin"/>
-                  <ellipse cx="40" cy="62" rx="22" ry="16" :fill="av.outfit"/>
-                  <path :d="av.hair" :fill="av.hairColor"/>
-                </svg>
+              <div style="flex:1">
+                <p style="color:var(--text2);font-size:12px;margin:0 0 6px">اضغط على الصورة لرفع صورة من جهازك</p>
+                <input ref="avatarInputEl" type="file" accept="image/*" style="display:none" @change="onAvatarUpload" />
+                <button class="btn-s" style="width:100%" @click="avatarInputEl?.click()">📷 رفع صورة من الجهاز</button>
               </div>
             </div>
             <div class="info-row"><span>الاسم</span><b>{{ profile.name }}</b></div>
@@ -699,6 +645,9 @@
               <button :class="['t-btn',{active:appSettings.theme==='light'}]" @click="setTheme('light')">☀️ فاتح</button>
               <button :class="['t-btn',{active:appSettings.theme==='library'}]" @click="setTheme('library')">📚 مكتبة</button>
             </div>
+            <p style="color:var(--text2);font-size:13px;margin:16px 0 8px">السطوع {{ appSettings.brightness }}%</p>
+            <input type="range" v-model.number="appSettings.brightness" min="40" max="100" step="5"
+              @change="saveSettings" style="width:100%;accent-color:var(--accent)" />
           </div>
 
           <div class="card">
@@ -728,29 +677,14 @@
             <button class="btn-o" @click="retakeDiag">إعادة الاختبار</button>
           </div>
 
-          <!-- 🧠 شخصية المعلم الذكي -->
           <div class="card">
-            <h3>🧠 شخصية المعلم الذكي</h3>
-            <p style="color:var(--text2);font-size:13px;margin:0 0 12px">اختر أسلوب المساعد الذكي الذي يناسبك</p>
-            <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px">
-              <button v-for="p in tutorPersonalities" :key="p.key"
-                      @click="chooseTutorPersonality(p.key)"
-                      :style="{padding:'12px',borderRadius:'12px',border:`2px solid ${appSettings.tutor_personality===p.key?'var(--accent)':'var(--border)'}`,background:appSettings.tutor_personality===p.key?'rgba(99,102,241,.15)':'var(--card)',color:'var(--text)',cursor:'pointer',textAlign:'right'}">
-                <div style="font-size:22px;margin-bottom:4px">{{ p.emoji }}</div>
-                <div style="font-weight:600;font-size:14px">{{ p.name }}</div>
-                <div style="font-size:11px;color:var(--text2);margin-top:4px">{{ p.style }}</div>
-              </button>
-            </div>
-          </div>
-
-          <div class="card">
-            <h3>📣 {{ t('complaint_suggestion') }}</h3>
+            <h3>📣 شكوى / اقتراح</h3>
             <select v-model="cpl.type" class="inp">
               <option value="complaint">شكوى</option><option value="suggestion">اقتراح</option><option value="bug">مشكلة تقنية</option>
             </select>
             <input v-model="cpl.title" class="inp" style="margin-top:10px" placeholder="العنوان" />
             <textarea v-model="cpl.content" class="inp" style="margin-top:10px" rows="3" placeholder="التفاصيل..."></textarea>
-            <button class="btn-p" style="margin-top:10px" @click="sendCpl" :disabled="!cpl.title||!cpl.content">{{ t('send') }}</button>
+            <button class="btn-p" style="margin-top:10px" @click="sendCpl" :disabled="!cpl.title||!cpl.content">إرسال</button>
             <p v-if="cplMsg" style="color:#4ade80;font-size:13px;margin-top:8px">{{ cplMsg }}</p>
           </div>
         </div>
@@ -764,33 +698,31 @@ import { ref, computed, onMounted, nextTick } from 'vue'
 import { useAuthStore } from '../stores/auth.js'
 import { useRouter } from 'vue-router'
 import { aiAPI, studentAPI, authAPI, teacherAPI } from '../api.js'
-import NavBar from '../components/NavBar.vue'
 import { useTheme } from '../composables/useTheme.js'
 import { useI18n, LANGUAGES } from '../composables/useI18n.js'
-import MatrixBackground from '../components/MatrixBackground.vue'
 
 const auth = useAuthStore()
 const router = useRouter()
 
-const sections = computed(() => [
-  { id:'chat',      svg:'<svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16"><path d="M18 10c0 3.87-3.58 7-8 7a8.8 8.8 0 01-3.8-.85L2 18l1.3-3.5A6.6 6.6 0 012 10c0-3.87 3.58-7 8-7s8 3.13 8 7zM7 9H5v2h2V9zm4 0H9v2h2V9zm4 0h-2v2h2V9z"/></svg>', label: t('student_chat') },
-  { id:'books',     svg:'<svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16"><path d="M3 4a1 1 0 011-1h3a1 1 0 011 1v12a1 1 0 01-1 1H4a1 1 0 01-1-1V4zm6 0a1 1 0 011-1h3a1 1 0 011 1v12a1 1 0 01-1 1h-3a1 1 0 01-1-1V4zm7-1a1 1 0 00-1 .8l1 12.4a1 1 0 001 .8h1a1 1 0 001-.8l-1-12.4a1 1 0 00-1-.8h-1z"/></svg>', label: t('books') },
-  { id:'games',     svg:'<svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16"><path d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.5 6a.5.5 0 01-.5-.5V14a1 1 0 10-2 0v1.5a.5.5 0 01-1 0V14a1 1 0 10-2 0v1.5a.5.5 0 01-1 0V14a3 3 0 016 0v1.5a.5.5 0 01-.5.5z"/></svg>', label: t('games') },
-  { id:'homework',  svg:'<svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16"><path d="M2 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1H3a1 1 0 01-1-1V4zm5-1a1 1 0 00-1 1v12a1 1 0 001 1h2a1 1 0 001-1V4a1 1 0 00-1-1H7zm5 0a1 1 0 00-.8.4l4 12a1 1 0 001.2.6l1.9-.6a1 1 0 00.6-1.2l-4-12a1 1 0 00-1.2-.6L12.2 3z"/></svg>', label: t('homework') },
-  { id:'tests',     svg:'<svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16"><path d="M9 2a1 1 0 00-1 1v1H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V6a2 2 0 00-2-2h-2V3a1 1 0 00-1-1H9zm0 2h2v1H9V4zM7 8h6v1H7V8zm0 3h6v1H7v-1zm0 3h4v1H7v-1z"/></svg>', label: t('tests') },
-  { id:'worksheets',svg:'<svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16"><path d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm2 4h8v1H6V7zm0 3h8v1H6v-1zm0 3h5v1H6v-1z"/></svg>', label: t('worksheets') },
-  { id:'image',     svg:'<svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16"><path d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z"/><circle cx="13.5" cy="7.5" r="1.5"/></svg>', label: t('image_gen') },
-  { id:'video',     svg:'<svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16"><path d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2l4 3V5l-4 3V5a2 2 0 00-2-2H4zm4 5l4 2.5L8 13V8z"/></svg>', label: t('video_script') },
-  { id:'leaderboard',svg:'<svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16"><path d="M9.05 3.69a1 1 0 011.9 0l1.28 3.94h4.15a1 1 0 01.59 1.81l-3.36 2.44 1.28 3.94a1 1 0 01-1.54 1.12L10 14.5l-3.35 2.44a1 1 0 01-1.54-1.12l1.28-3.94L3.03 9.44a1 1 0 01.59-1.81h4.15L9.05 3.69z"/></svg>', label: t('leaderboard') },
-  { id:'daily',     svg:'<svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16"><path d="M11.3 1.05a1 1 0 00-1.1.45L5.7 9H2a1 1 0 00-.8 1.6l7.5 10a1 1 0 001.8-.6L9.7 13H18a1 1 0 00.8-1.6l-7.5-10.35z"/></svg>', label: t('daily_challenge') },
-  { id:'pomodoro',  svg:'<svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16"><path d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.3.7l2.8 2.8a1 1 0 001.4-1.4L11 9.6V6z"/></svg>', label: t('pomodoro') },
-  { id:'mood',      svg:'<svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16"><path d="M10 18a8 8 0 100-16 8 8 0 000 16zM7 9a1 1 0 100-2 1 1 0 000 2zm6 0a1 1 0 100-2 1 1 0 000 2zm-7.5 3a5.5 5.5 0 009 0h-9z"/></svg>', label: t('mood') },
-  { id:'reflection',svg:'<svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16"><path d="M9 4.8a.5.5 0 01.5-.8h1a.5.5 0 01.5.8L10 6l-1-1.2zM10 18a8 8 0 100-16 8 8 0 000 16zm-1-6a1 1 0 112 0v2a1 1 0 11-2 0v-2zm1-6a1 1 0 100 2 1 1 0 000-2z"/></svg>', label: t('reflection') },
-  { id:'library',   svg:'<svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16"><path d="M2 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1H3a1 1 0 01-1-1V4zm5-1a1 1 0 00-1 1v12a1 1 0 001 1h2a1 1 0 001-1V4a1 1 0 00-1-1H7zm5 0a1 1 0 00-.8.4l4 12a1 1 0 001.2.6l1.9-.6a1 1 0 00.6-1.2l-4-12a1 1 0 00-1.2-.6L12.2 3z"/></svg>', label: t('digital_library') },
-  { id:'notebook',  svg:'<svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16"><path d="M6 2a2 2 0 00-2 2v12a2 2 0 002 2h8a2 2 0 002-2V4a2 2 0 00-2-2H6zm1 3h6v1H7V5zm0 3h6v1H7V8zm0 3h4v1H7v-1z"/></svg>', label: t('notebook') },
-  { id:'progress',  svg:'<svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16"><path d="M2 11h3v6H2zm5-4h3v10H7zm5-5h3v15h-3z"/></svg>', label: t('progress') },
-  { id:'settings',  svg:'<svg viewBox="0 0 20 20" fill="currentColor" width="16" height="16"><path d="M11.5 2.6l.8 1.5a1 1 0 001 .5l1.6-.2a8 8 0 011.5 1.5l-.2 1.6a1 1 0 00.5 1l1.5.8v2.1l-1.5.8a1 1 0 00-.5 1l.2 1.6a8 8 0 01-1.5 1.5l-1.6-.2a1 1 0 00-1 .5l-.8 1.5H8.5l-.8-1.5a1 1 0 00-1-.5l-1.6.2a8 8 0 01-1.5-1.5l.2-1.6a1 1 0 00-.5-1L1.8 11V8.9l1.5-.8a1 1 0 00.5-1l-.2-1.6a8 8 0 011.5-1.5l1.6.2a1 1 0 001-.5l.8-1.5h3zM10 7a3 3 0 100 6 3 3 0 000-6z"/></svg>', label: t('settings') },
-])
+const sections = [
+  { id:'chat',icon:'💬',label:'المحادثة' },
+  { id:'books',icon:'📖',label:'ملخص الكتاب' },
+  { id:'games',icon:'🎮',label:'الألعاب' },
+  { id:'homework',icon:'📚',label:'الواجبات' },
+  { id:'tests',icon:'📝',label:'الاختبارات' },
+  { id:'worksheets',icon:'📋',label:'أوراق العمل' },
+  { id:'image',icon:'🎨',label:'توليد صور' },
+  { id:'video',icon:'🎬',label:'سكريبت فيديو' },
+  { id:'leaderboard',icon:'🏆',label:'لوحة المتصدرين' },
+  { id:'daily',icon:'🎯',label:'التحدي اليومي' },
+  { id:'pomodoro',icon:'⏱️',label:'بومودورو' },
+  { id:'mood',icon:'😊',label:'مزاجي اليوم' },
+  { id:'reflection',icon:'🌅',label:'التأمل اليومي' },
+  { id:'library',icon:'📚',label:'المكتبة الرقمية' },
+  { id:'notebook',icon:'📓',label:'NotebookLM' },
+  { id:'progress',icon:'📊',label:'تقدمي' },
+  { id:'settings',icon:'⚙️',label:'الإعدادات' },
+]
 
 const currentSection = ref('chat')
 const sidebarCollapsed = ref(false)
@@ -891,25 +823,9 @@ const attachedFileText = ref(null)
 const prog = ref({})
 
 // Settings
-const appSettings = ref({ theme:'dark', difficulty:'medium', hobbies:[], notifications_enabled:true, avatar_url:'', language:'ar', tutor_personality:'friend' })
-
-const avatarOptions = [
-  { id: 'av1', bg: '#E3F2FD', skin: '#FDBCB4', hairColor: '#3E2723', outfit: '#1976D2', hair: 'M24,24 Q40,8 56,24 Q56,16 40,12 Q24,16 24,24Z' },
-  { id: 'av2', bg: '#FFF3E0', skin: '#8D5524', hairColor: '#1B1B1B', outfit: '#E65100', hair: 'M24,26 Q40,10 56,26 L56,20 Q40,6 24,20Z' },
-  { id: 'av3', bg: '#E8F5E9', skin: '#F1C27D', hairColor: '#6D4C41', outfit: '#2E7D32', hair: 'M22,28 Q40,6 58,28 Q58,18 40,10 Q22,18 22,28Z' },
-  { id: 'av4', bg: '#FCE4EC', skin: '#FDBCB4', hairColor: '#D32F2F', outfit: '#AD1457', hair: 'M20,30 Q30,10 40,16 Q50,10 60,30 Q60,20 40,8 Q20,20 20,30Z' },
-  { id: 'av5', bg: '#F3E5F5', skin: '#C68642', hairColor: '#4E342E', outfit: '#6A1B9A', hair: 'M24,24 Q40,12 56,24 Q54,16 40,10 Q26,16 24,24Z' },
-  { id: 'av6', bg: '#E0F7FA', skin: '#FFE0BD', hairColor: '#BF360C', outfit: '#00838F', hair: 'M24,28 Q32,12 40,16 Q48,12 56,28 L54,20 Q40,8 26,20Z' },
-  { id: 'av7', bg: '#FFF8E1', skin: '#8D5524', hairColor: '#212121', outfit: '#F57F17', hair: 'M26,22 Q40,14 54,22 Q52,18 40,14 Q28,18 26,22Z' },
-  { id: 'av8', bg: '#E8EAF6', skin: '#FDBCB4', hairColor: '#1A237E', outfit: '#283593', hair: 'M22,26 Q40,4 58,26 Q56,14 40,6 Q24,14 22,26Z' },
-  { id: 'av9', bg: '#EFEBE9', skin: '#F1C27D', hairColor: '#3E2723', outfit: '#4E342E', hair: 'M24,24 Q40,10 56,24 L54,18 Q40,8 26,18Z' },
-  { id: 'av10', bg: '#E0F2F1', skin: '#D1A36C', hairColor: '#1B5E20', outfit: '#00695C', hair: 'M20,28 Q40,8 60,28 Q58,16 40,6 Q22,16 20,28Z' },
-  { id: 'av11', bg: '#FBE9E7', skin: '#FFE0BD', hairColor: '#4A148C', outfit: '#BF360C', hair: 'M24,26 Q34,14 40,18 Q46,14 56,26 L54,18 Q40,8 26,18Z' },
-  { id: 'av12', bg: '#F1F8E9', skin: '#C68642', hairColor: '#33691E', outfit: '#558B2F', hair: 'M26,24 Q40,12 54,24 Q52,16 40,10 Q28,16 26,24Z' },
-]
-const avatarMap = Object.fromEntries(avatarOptions.map(a => [a.id, a]))
+const appSettings = ref({ theme:'dark', brightness:100, difficulty:'medium', hobbies:[], notifications_enabled:true, avatar_url:'', language:'ar' })
 useTheme(appSettings)
-const { t, lang, setLang } = useI18n()
+const { setLang } = useI18n()
 const languages = LANGUAGES
 function changeStudentLang(code) {
   appSettings.value.language = code
@@ -917,6 +833,7 @@ function changeStudentLang(code) {
   saveSettings()
 }
 const hobbiesInput = ref('')
+const avatarInputEl = ref(null)
 const oldPass = ref('')
 const newPass = ref('')
 const passMsg = ref('')
@@ -930,8 +847,6 @@ onMounted(async () => {
   await loadConversations()
   await loadProgress()
   await loadUserSettings()
-  loadMoodHistory()
-  loadTutorPersonalities()
 })
 
 async function loadProfile() {
@@ -1054,17 +969,11 @@ const moods = [
   { key:'neutral', emoji:'🙂', label:'عادي' },
 ]
 const moodSuggestion = ref('')
-const moodHistory = ref([])
 async function logMood(key) {
   try {
     const r = await studentAPI.logMood(key)
     moodSuggestion.value = r.data.suggestion
-    // تحديث السجل بعد التسجيل
-    await loadMoodHistory()
   } catch {}
-}
-async function loadMoodHistory() {
-  try { moodHistory.value = (await studentAPI.getMoodHistory()).data || [] } catch {}
 }
 
 // ========== 📚 Digital Library ==========
@@ -1088,53 +997,27 @@ const nbAsking = ref(false)
 const nbGenLoading = ref(false)
 const nbGenResult = ref('')
 
-// ضغط الصور قبل الرفع باستخدام Canvas
-function _compressImage(file, maxW, maxH, quality) {
-  return new Promise((resolve) => {
-    const reader = new FileReader()
-    reader.onload = ev => {
-      const img = new Image()
-      img.onload = () => {
-        const canvas = document.createElement('canvas')
-        let w = img.width, h = img.height
-        if (w > maxW || h > maxH) {
-          const ratio = Math.min(maxW / w, maxH / h)
-          w = Math.round(w * ratio); h = Math.round(h * ratio)
-        }
-        canvas.width = w; canvas.height = h
-        canvas.getContext('2d').drawImage(img, 0, 0, w, h)
-        resolve(canvas.toDataURL('image/jpeg', quality))
-      }
-      img.src = ev.target.result
-    }
-    reader.readAsDataURL(file)
-  })
-}
-
 async function onNbFileUpload(e) {
   const file = e.target.files?.[0]
   if (!file) return
-  if (file.size > 15 * 1024 * 1024) { alert('الملف أكبر من 15MB — اختر ملفاً أصغر'); return }
+  if (file.size > 5 * 1024 * 1024) { alert('الملف أكبر من 5MB — اختر ملفاً أصغر'); return }
   nbFileName.value = file.name
-  const fname = file.name.toLowerCase()
-  if (fname.endsWith('.txt') || fname.endsWith('.md')) {
+  if (file.name.toLowerCase().endsWith('.pdf')) {
+    // قراءة PDF كنص (نطلب من الباك إند يقرأها لاحقاً)
     const reader = new FileReader()
-    reader.onload = (ev) => { nbFileText.value = (ev.target.result || '').slice(0, 80000) }
-    reader.readAsText(file, 'utf-8')
-  } else if (fname.endsWith('.pdf') || fname.endsWith('.pptx') || fname.endsWith('.docx')) {
-    nbFileText.value = '⏳ جاري استخراج النص...'
-    try {
-      const r = await aiAPI.extractFile(file)
-      nbFileText.value = r.data.text || ''
-      if (!nbFileText.value) { alert('لم يُستخرج أي نص من الملف'); nbFileName.value = '' }
-    } catch (err) {
-      alert('تعذر استخراج النص من الملف')
-      nbFileName.value = ''
-      nbFileText.value = ''
+    reader.onload = (ev) => {
+      // نخزن الـ base64 ونرسلها للباك إند للتفريغ — أو نستخدم pdf.js. للسرعة نقرأها كنص.
+      nbFileText.value = '[PDF: ' + file.name + ' — حجم: ' + Math.round(file.size/1024) + 'KB]\n' + 'استخدم محتوى الملف في إجاباتك.'
+      // قراءة محسنة عبر FileReader.readAsText (ينجح لـ PDFs نصية بسيطة)
+      const r2 = new FileReader()
+      r2.onload = (ev2) => { try { nbFileText.value = ev2.target.result.slice(0, 50000) } catch {} }
+      r2.readAsText(file)
     }
+    reader.readAsArrayBuffer(file)
   } else {
-    alert('صيغة غير مدعومة — استخدم PDF أو PPTX أو DOCX أو TXT أو MD')
-    nbFileName.value = ''
+    const reader = new FileReader()
+    reader.onload = (ev) => { nbFileText.value = (ev.target.result || '').slice(0, 50000) }
+    reader.readAsText(file, 'utf-8')
   }
 }
 
@@ -1226,26 +1109,16 @@ async function sendMsg(text) {
 
 async function onFileAttach(e) {
   const file = e.target.files[0]; if (!file) return
-  if (file.size > 15 * 1024 * 1024) { alert('الملف أكبر من 15MB'); e.target.value = ''; return }
   attachedFile.value = file
   attachedBase64.value = null; attachedFileText.value = null
-  const fname = file.name.toLowerCase()
   if (file.type.startsWith('image/')) {
-    const dataUrl = await _compressImage(file, 1024, 1024, 0.8)
-    attachedBase64.value = dataUrl.split(',')[1]
-  } else if (fname.endsWith('.txt') || fname.endsWith('.md') || file.type === 'text/plain') {
     const reader = new FileReader()
-    reader.onload = ev => { attachedFileText.value = (ev.target.result || '').slice(0, 80000) }
+    reader.onload = ev => { attachedBase64.value = ev.target.result.split(',')[1] }
+    reader.readAsDataURL(file)
+  } else if (file.type === 'text/plain') {
+    const reader = new FileReader()
+    reader.onload = ev => { attachedFileText.value = ev.target.result }
     reader.readAsText(file)
-  } else if (fname.endsWith('.pdf') || fname.endsWith('.pptx') || fname.endsWith('.docx')) {
-    try {
-      const r = await aiAPI.extractFile(file)
-      attachedFileText.value = r.data.text || ''
-    } catch {
-      alert('تعذر قراءة الملف')
-      attachedFile.value = null
-      e.target.value = ''
-    }
   }
 }
 function clearAttach() { attachedFile.value=null; attachedBase64.value=null; attachedFileText.value=null; if(fileInputEl.value) fileInputEl.value.value='' }
@@ -1335,53 +1208,14 @@ async function genImage() {
   finally { imgLoading.value=false }
 }
 
+function copyText(t) { navigator.clipboard?.writeText(t).catch(()=>{}) }
+
 // ========== Video ==========
 async function genVideo() {
   vidLoading.value=true; vidScript.value=''
-  try {
-    const r = await studentAPI.generateVideo({ topic: vidTopic.value, subject: vidSubject.value, duration_seconds: vidSeconds.value })
-    vidScript.value = r.data.script
-  } catch { vidScript.value = 'تعذر توليد السكريبت.' }
-  finally { vidLoading.value = false }
-}
-
-// ========== Chat Quick Gen ==========
-const chatGenMode = ref(null)    // null | 'image' | 'video'
-const chatImgPrompt = ref('')
-const chatGenLoading = ref(false)
-
-async function doChatGenImage() {
-  if (!chatImgPrompt.value.trim()) return
-  chatGenLoading.value = true
-  try {
-    const r = await aiAPI.generateImage(chatImgPrompt.value)
-    if (r.data.success && r.data.image) {
-      genImg.value = r.data.image
-      messages.value.push({ role: 'assistant', content: `🖼️ **صورة: ${chatImgPrompt.value}**\n\n[الصورة تعرض أدناه في منطقة الإرفاق]` })
-      // أرسل الصورة مباشرة في الشات
-      chatInput.value = ''
-      const prevBase64 = attachedBase64.value
-      attachedBase64.value = r.data.image
-      await sendMsg(`🖼️ صورة مولّدة: ${chatImgPrompt.value}`)
-      chatImgPrompt.value = ''
-      chatGenMode.value = null
-    } else {
-      messages.value.push({ role: 'assistant', content: `❌ تعذر توليد الصورة: ${r.data.message || ''}` })
-    }
-  } catch { messages.value.push({ role: 'assistant', content: '❌ خطأ في توليد الصورة' }) }
-  finally { chatGenLoading.value = false }
-}
-
-async function doChatGenVideo() {
-  if (!vidTopic.value.trim()) return
-  vidLoading.value = true
-  chatGenMode.value = null
-  messages.value.push({ role: 'user', content: `🎬 ولّد سكريبت فيديو: ${vidTopic.value}` })
-  try {
-    const r = await studentAPI.generateVideo({ topic: vidTopic.value, subject: vidSubject.value, duration_seconds: vidSeconds.value })
-    messages.value.push({ role: 'assistant', content: r.data.script })
-  } catch { messages.value.push({ role: 'assistant', content: 'تعذر توليد السكريبت.' }) }
-  finally { vidLoading.value = false; scroll() }
+  try { const r=await teacherAPI.generateVideo({topic:vidTopic.value,subject:vidSubject.value,duration_seconds:vidSeconds.value}); vidScript.value=r.data.script }
+  catch { vidScript.value='تعذر توليد السكريبت.' }
+  finally { vidLoading.value=false }
 }
 
 function formatVidDur(secs) {
@@ -1395,23 +1229,18 @@ function formatVidDur(secs) {
 function setTheme(t) { appSettings.value.theme=t; saveSettings() }
 async function saveSettings() { try { await studentAPI.updateSettings(appSettings.value) } catch {} }
 
-function selectAvatar(id) {
-  appSettings.value.avatar_url = id
-  saveSettings()
+async function onAvatarUpload(e) {
+  const file = e.target.files?.[0]; if(!file) return
+  if(file.size > 500 * 1024) { alert('الصورة أكبر من 500 كيلوبايت — اختر صورة أصغر'); return }
+  const reader = new FileReader()
+  reader.onload = async (ev) => {
+    appSettings.value.avatar_url = ev.target.result // base64 data URL
+    await saveSettings()
+  }
+  reader.readAsDataURL(file)
+  if(avatarInputEl.value) avatarInputEl.value.value = ''
 }
 async function saveHobbies() { appSettings.value.hobbies=hobbiesInput.value.split(/[,،]/).map(h=>h.trim()).filter(Boolean); await saveSettings() }
-
-// 🧠 Tutor Personality
-const tutorPersonalities = ref([])
-async function loadTutorPersonalities() {
-  try { tutorPersonalities.value = (await studentAPI.getTutorPersonalities()).data || [] } catch {}
-}
-async function chooseTutorPersonality(key) {
-  try {
-    await studentAPI.setTutorPersonality(key)
-    appSettings.value.tutor_personality = key
-  } catch {}
-}
 async function changePass() {
   passMsg.value=''
   try { await authAPI.changePassword(oldPass.value,newPass.value); passMsg.value='✅ تم تغيير كلمة المرور بنجاح'; oldPass.value=''; newPass.value='' }
@@ -1423,9 +1252,6 @@ async function sendCpl() {
 }
 async function handleLogout() { await auth.logout(); router.push('/login') }
 
-function copyText(t) {
-  navigator.clipboard?.writeText(t).catch(() => {})
-}
 function fmt(t) {
   if(!t) return ''
   return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
@@ -1436,18 +1262,21 @@ function fmtDate(d) { return d ? new Date(d).toLocaleDateString('ar-SA') : '' }
 </script>
 
 <style scoped>
-.hub { display:flex; height:100vh; overflow:hidden; font-family:'Segoe UI','Cairo',sans-serif; direction:rtl; background:var(--bg1); }
+.hub { display:flex; height:100vh; overflow:hidden; font-family:'Segoe UI','Cairo',sans-serif; direction:rtl; }
+.theme-dark  { --bg1:#0f172a;--bg2:#1e293b;--bg3:#334155;--text:#f1f5f9;--text2:#94a3b8;--accent:#6366f1;--border:rgba(255,255,255,.08);--card:rgba(255,255,255,.05); }
+.theme-light { --bg1:#f8fafc;--bg2:#e2e8f0;--bg3:#cbd5e1;--text:#0f172a;--text2:#475569;--accent:#6366f1;--border:rgba(0,0,0,.1);--card:#fff; }
+.theme-library { --bg1:#1a1207;--bg2:#2d1f0b;--bg3:#3d2a0f;--text:#f5e6c8;--text2:#c9a96e;--accent:#c97c2e;--border:rgba(201,124,46,.2);--card:rgba(201,124,46,.06); }
 
-.sidebar { width:240px;min-width:240px;background:var(--sidebar-bg);border-left:var(--sidebar-border);display:flex;flex-direction:column;transition:width .25s,min-width .25s;overflow:hidden;backdrop-filter:var(--sidebar-blur);position:relative;z-index:10; }
+.sidebar { width:240px;min-width:240px;background:var(--bg2);border-left:1px solid var(--border);display:flex;flex-direction:column;transition:width .25s,min-width .25s;overflow:hidden; }
 .sidebar.collapsed { width:64px;min-width:64px; }
 .sidebar-header { padding:16px;cursor:pointer;border-bottom:1px solid var(--border); }
 .brand { display:flex;align-items:center;gap:12px; }
-.brand-icon { width:36px;height:36px;min-width:36px;background:var(--brand-gradient);border-radius:var(--radius-sm);display:flex;align-items:center;justify-content:center;font-weight:900;font-size:18px;color:var(--brand-text); }
+.brand-icon { width:36px;height:36px;min-width:36px;background:linear-gradient(135deg,#6366f1,#8b5cf6);border-radius:10px;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:18px;color:#fff; }
 .brand-name { font-size:18px;font-weight:800;color:var(--text); }
 .sidebar-nav { flex:1;padding:8px;overflow-y:auto; }
 .nav-item { display:flex;align-items:center;gap:12px;width:100%;padding:10px 12px;border-radius:10px;background:none;border:none;color:var(--text2);cursor:pointer;font-size:14px;font-weight:500;transition:all .15s;text-align:right;white-space:nowrap; }
-.nav-item:hover { background:var(--nav-hover-bg);color:var(--text); }
-.nav-item.active { background:var(--nav-active-bg);color:var(--accent);box-shadow:none; }
+.nav-item:hover { background:rgba(99,102,241,.1);color:var(--text); }
+.nav-item.active { background:rgba(99,102,241,.2);color:var(--accent); }
 .nav-icon { font-size:18px;min-width:20px; }
 .sidebar-footer { padding:12px;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:8px; }
 .streak-row { display:flex;gap:12px;justify-content:center;font-size:13px;color:var(--text2); }
@@ -1455,16 +1284,15 @@ function fmtDate(d) { return d ? new Date(d).toLocaleDateString('ar-SA') : '' }
 .logout-btn { display:flex;align-items:center;justify-content:center;gap:8px;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.2);color:#f87171;border-radius:8px;padding:8px;cursor:pointer;font-size:13px;transition:background .15s;width:100%; }
 .logout-btn:hover { background:rgba(239,68,68,.2); }
 
-.main-content { flex:1;display:flex;flex-direction:column;background:transparent;overflow:hidden;position:relative;z-index:10; }
-.top-bar { display:flex;align-items:center;justify-content:space-between;padding:14px 24px;border-bottom:var(--topbar-border);background:var(--topbar-bg);backdrop-filter:var(--sidebar-blur); }
+.main-content { flex:1;display:flex;flex-direction:column;background:var(--bg1);overflow:hidden; }
+.top-bar { display:flex;align-items:center;justify-content:space-between;padding:14px 24px;border-bottom:1px solid var(--border);background:var(--bg2); }
 .section-title { font-size:18px;font-weight:700;color:var(--text);margin:0; }
 .user-chip { display:flex;align-items:center;gap:10px;color:var(--text2);font-size:14px; }
-.avatar { width:34px;height:34px;background:var(--btn-gradient);border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;color:var(--btn-text);font-size:15px; }
+.avatar { width:34px;height:34px;background:linear-gradient(135deg,var(--accent),#8b5cf6);border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;color:#fff;font-size:15px; }
 .section-body { flex:1;overflow-y:auto; }
 .section-body.pad { padding:24px; }
 
-.card { background:var(--card);border:1px solid var(--border);border-radius:16px;padding:24px;margin-bottom:16px;backdrop-filter:blur(10px);transition:box-shadow .2s; }
-.card:hover { box-shadow:var(--glow); }
+.card { background:var(--card);border:1px solid var(--border);border-radius:16px;padding:24px;margin-bottom:16px; }
 .card h3 { color:var(--text);margin:0 0 20px;font-size:17px; }
 
 /* Diagnostic */
@@ -1479,8 +1307,8 @@ function fmtDate(d) { return d ? new Date(d).toLocaleDateString('ar-SA') : '' }
 
 /* Chat */
 .chat-layout { display:flex;height:100%;overflow:hidden; }
-.conv-panel { width:210px;min-width:210px;background:var(--bg2);border-left:var(--sidebar-border);display:flex;flex-direction:column;padding:12px;gap:8px; }
-.new-conv-btn { background:var(--accent);color:var(--btn-text);border:none;border-radius:var(--radius-sm);padding:10px;cursor:pointer;font-size:13px;font-weight:600; }
+.conv-panel { width:210px;min-width:210px;background:var(--bg2);border-left:1px solid var(--border);display:flex;flex-direction:column;padding:12px;gap:8px; }
+.new-conv-btn { background:var(--accent);color:#fff;border:none;border-radius:10px;padding:10px;cursor:pointer;font-size:13px;font-weight:600; }
 .conv-list { flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:4px; }
 .conv-item { display:flex;align-items:center;justify-content:space-between;padding:8px 10px;border-radius:8px;cursor:pointer;transition:background .15s;color:var(--text2);font-size:13px; }
 .conv-item:hover,.conv-item.active { background:rgba(99,102,241,.15);color:var(--text); }
@@ -1515,38 +1343,11 @@ function fmtDate(d) { return d ? new Date(d).toLocaleDateString('ar-SA') : '' }
 .input-row { display:flex;gap:10px;padding:14px 20px;border-top:1px solid var(--border);background:var(--bg2);align-items:flex-end; }
 .input-row textarea,.input-row input { flex:1;background:var(--bg3);border:1px solid var(--border);color:var(--text);border-radius:12px;padding:12px 16px;font-size:14px;resize:none;font-family:inherit;text-align:right; }
 .input-row textarea:focus,.input-row input:focus { outline:none;border-color:var(--accent); }
-.send-btn { background:var(--accent);color:var(--btn-text);border:none;border-radius:var(--radius-sm);width:44px;height:44px;cursor:pointer;font-size:18px;flex-shrink:0;display:flex;align-items:center;justify-content:center; }
+.send-btn { background:var(--accent);color:#fff;border:none;border-radius:12px;width:44px;height:44px;cursor:pointer;font-size:18px;flex-shrink:0;display:flex;align-items:center;justify-content:center; }
 .send-btn:disabled { opacity:.5;cursor:not-allowed; }
 .attach-btn { background:var(--bg3);border:1px solid var(--border);color:var(--text2);border-radius:12px;width:44px;height:44px;cursor:pointer;font-size:18px;flex-shrink:0;display:flex;align-items:center;justify-content:center;transition:all .15s; }
-.attach-btn:hover { border-color:var(--accent);color:var(--accent);box-shadow:0 0 10px rgba(79,158,255,.2); }
-.attach-btn.active { border-color:var(--accent);color:var(--accent);background:var(--nav-active-bg);box-shadow:var(--nav-active-shadow); }
+.attach-btn:hover { border-color:var(--accent);color:var(--accent); }
 .attach-chip { background:rgba(99,102,241,.15);border:1px solid rgba(99,102,241,.3);color:var(--accent);border-radius:8px;padding:4px 10px;font-size:12px;white-space:nowrap;display:flex;align-items:center;gap:6px; }
-
-/* Chat Quick Gen Bar */
-.chat-gen-bar {
-  padding: 10px 16px; border-top: 1px solid var(--border);
-  background: var(--glass, var(--bg2));
-  backdrop-filter: var(--card-blur);
-  animation: slideDown 0.2s ease;
-}
-@keyframes slideDown { from { opacity:0;transform:translateY(-6px); } to { opacity:1;transform:translateY(0); } }
-.chat-gen-inner { display:flex;align-items:center;gap:8px;flex-wrap:wrap; }
-.gen-label { font-size:13px;font-weight:600;color:var(--accent);white-space:nowrap; }
-.gen-input {
-  flex:1;min-width:160px;background:var(--input-bg);border:1px solid var(--input-border);
-  color:var(--text);border-radius:10px;padding:8px 12px;font-size:13px;font-family:inherit;
-  text-align:right;
-}
-.gen-input:focus { outline:none;border-color:var(--accent);box-shadow:0 0 0 2px rgba(79,158,255,.1); }
-.gen-go {
-  background:var(--btn-gradient);color:var(--btn-text);border:none;border-radius:10px;
-  padding:8px 16px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;
-  box-shadow:var(--btn-glow);transition:all .2s;
-}
-.gen-go:hover:not(:disabled) { filter:brightness(1.1);transform:translateY(-1px); }
-.gen-go:disabled { opacity:.5;cursor:not-allowed; }
-.gen-close { background:none;border:none;color:var(--text2);cursor:pointer;font-size:16px;padding:4px; }
-.gen-close:hover { color:var(--text); }
 
 /* Books */
 .summary-box { background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:16px; }
@@ -1607,11 +1408,7 @@ function fmtDate(d) { return d ? new Date(d).toLocaleDateString('ar-SA') : '' }
 .av-preview{width:60px;height:60px;border-radius:50%;object-fit:cover;border:2px solid var(--border);}
 .av-overlay{position:absolute;inset:0;border-radius:50%;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;font-size:18px;opacity:0;transition:opacity .15s;}
 .avatar-section>div:first-child:hover .av-overlay{opacity:1;}
-.av-big{width:60px;height:60px;min-width:60px;background:var(--btn-gradient);border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:26px;color:var(--btn-text);}
-.avatar-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:12px 0;}
-.avatar-option{cursor:pointer;border-radius:50%;padding:4px;border:3px solid transparent;transition:all 0.2s;display:flex;align-items:center;justify-content:center;}
-.avatar-option:hover{border-color:var(--accent);transform:scale(1.1);}
-.avatar-option.selected{border-color:var(--accent);box-shadow:0 0 12px var(--accent);}
+.av-big{width:60px;height:60px;min-width:60px;background:linear-gradient(135deg,var(--accent),#8b5cf6);border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:26px;color:#fff;}
 .info-row{display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);color:var(--text2);font-size:13px;}
 .info-row b{color:var(--text);}
 .info-row { display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border);color:var(--text2);font-size:14px; }
@@ -1626,8 +1423,8 @@ function fmtDate(d) { return d ? new Date(d).toLocaleDateString('ar-SA') : '' }
 select.inp { cursor:pointer; }
 textarea.inp { resize:vertical; }
 .row-gap { display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px; }
-.btn-p { background:var(--btn-gradient);color:var(--btn-text);border:none;border-radius:var(--radius-sm);padding:12px 20px;cursor:pointer;font-size:14px;font-weight:700;transition:opacity .15s; }
-.btn-p:hover:not(:disabled) { opacity:.85; }
+.btn-p { background:var(--accent);color:#fff;border:none;border-radius:10px;padding:12px 20px;cursor:pointer;font-size:14px;font-weight:600;transition:opacity .15s; }
+.btn-p:hover:not(:disabled) { opacity:.88; }
 .btn-p:disabled { opacity:.5;cursor:not-allowed; }
 .btn-o { background:transparent;border:1px solid var(--border);color:var(--text2);border-radius:10px;padding:12px 20px;cursor:pointer;font-size:14px;transition:border-color .15s; }
 .btn-o:hover { border-color:var(--accent);color:var(--accent); }

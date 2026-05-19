@@ -62,55 +62,12 @@ async def reset_password(
     new_password = body.get("new_password", "")
     if len(new_password) < 6:
         raise HTTPException(status_code=400, detail="كلمة المرور لازم تكون 6 أحرف على الأقل")
-    if len(new_password) > 128:
-        raise HTTPException(status_code=400, detail="كلمة المرور طويلة جداً (الحد الأقصى 128 حرف)")
-
-    # التحقق أن الطالب ينتمي لنفس المدرسة (منع IDOR)
-    school_id = current_user.get("school_id")
-    if school_id:
-        student = db.table("users").select("school_id, role").eq("id", student_id).execute()
-        if not student.data:
-            raise HTTPException(status_code=404, detail="الطالب غير موجود")
-        if student.data[0].get("school_id") != school_id:
-            raise HTTPException(status_code=403, detail="لا يمكنك تعديل حسابات خارج مدرستك")
-        if student.data[0].get("role") in ("manager", "owner"):
-            raise HTTPException(status_code=403, detail="لا يمكن إعادة تعيين كلمة سر هذا الحساب")
 
     new_hash = hash_password(new_password)
     db.table("users").update({
         "password_hash": new_hash,
         "must_change_password": False
     }).eq("id", student_id).execute()
-
-    # حفظ الباسوورد الجديد في school_setup
-    school_id = current_user.get("school_id")
-    if school_id:
-        try:
-            student = db.table("users").select("full_name, email").eq("id", student_id).execute()
-            if student.data:
-                setup = db.table("school_setup").select("passwords_data").eq("school_id", school_id).execute()
-                passwords = setup.data[0]["passwords_data"] if setup.data and setup.data[0].get("passwords_data") else []
-                # تحديث كلمة مرور الطالب في القائمة
-                updated = False
-                for acc in passwords:
-                    if acc.get("email") == student.data[0]["email"]:
-                        acc["password"] = new_password
-                        updated = True
-                        break
-                if not updated:
-                    passwords.append({
-                        "full_name": student.data[0]["full_name"],
-                        "email": student.data[0]["email"],
-                        "password": new_password,
-                        "role": "student"
-                    })
-                db.table("school_setup").upsert({
-                    "school_id": school_id,
-                    "passwords_data": passwords,
-                    "total_accounts_generated": len(passwords)
-                }).execute()
-        except Exception as e:
-            logger.warning(f"Failed to save password: {e}")
 
     return {"message": "تم إعادة تعيين كلمة المرور بنجاح"}
 
@@ -121,16 +78,9 @@ async def toggle_student(
     current_user: dict = Depends(_require_admin),
     db=Depends(get_db)
 ):
-    school_id = current_user.get("school_id")
-    query = db.table("users").select("is_active, school_id, role").eq("id", student_id)
-    student = query.execute()
+    student = db.table("users").select("is_active").eq("id", student_id).execute()
     if not student.data:
         raise HTTPException(status_code=404, detail="الطالب غير موجود")
-    # منع IDOR: الأدمن لا يستطيع تعطيل حسابات خارج مدرسته
-    if school_id and student.data[0].get("school_id") != school_id:
-        raise HTTPException(status_code=403, detail="لا يمكنك تعديل حسابات خارج مدرستك")
-    if student.data[0].get("role") in ("manager", "owner"):
-        raise HTTPException(status_code=403, detail="لا يمكن تعطيل حساب مدير أو مالك")
     new_status = not student.data[0]["is_active"]
     db.table("users").update({"is_active": new_status}).eq("id", student_id).execute()
     return {"message": "تم التحديث", "is_active": new_status}
@@ -154,7 +104,10 @@ async def upload_excel(
     except ImportError:
         raise HTTPException(status_code=500, detail="مكتبة openpyxl غير مثبتة")
 
-    content = await file.read()
+    MAX_FILE_SIZE = 5 * 1024 * 1024  # 5MB
+    content = await file.read(MAX_FILE_SIZE + 1)
+    if len(content) > MAX_FILE_SIZE:
+        raise HTTPException(status_code=400, detail="حجم الملف يتجاوز الحد المسموح (5MB)")
     try:
         wb = openpyxl.load_workbook(io.BytesIO(content))
     except Exception:
@@ -237,6 +190,7 @@ async def get_settings(current_user: dict = Depends(_require_admin), db=Depends(
     settings = result.data[0] if result.data else {}
     return {
         "theme": settings.get("theme", "dark"),
+        "brightness": settings.get("brightness", 100),
         "language": settings.get("language", "ar"),
         "notifications_enabled": settings.get("notifications_enabled", True),
         "avatar_url": current_user.get("avatar_url", ""),
@@ -248,15 +202,21 @@ async def get_settings(current_user: dict = Depends(_require_admin), db=Depends(
 @router.put("/settings")
 async def update_settings(body: dict, current_user: dict = Depends(_require_admin), db=Depends(get_db)):
     valid_langs = {"ar", "en", "de", "fr", "zh", "es"}
-    valid_themes = {"dark", "light", "library", "neon"}
+    valid_themes = {"dark", "light", "library"}
 
     theme = body.get("theme", "dark")
     if theme not in valid_themes: theme = "dark"
     lang = body.get("language", "ar")
     if lang not in valid_langs: lang = "ar"
+    try:
+        brightness = max(20, min(100, int(body.get("brightness", 100))))
+    except Exception:
+        brightness = 100
+
     data = {
         "user_id": current_user["id"],
         "theme": theme,
+        "brightness": brightness,
         "language": lang,
         "notifications_enabled": bool(body.get("notifications_enabled", True)),
     }
@@ -363,8 +323,8 @@ async def make_announcement(
     db=Depends(get_db),
 ):
     """إعلان مدرسي"""
-    title = (body.get("title") or "").strip()[:200]   # حد العنوان 200 حرف
-    content = (body.get("content") or "").strip()[:2000]  # حد المحتوى 2000 حرف
+    title = (body.get("title") or "").strip()
+    content = (body.get("content") or "").strip()
     if not title or not content:
         raise HTTPException(400, "أدخل العنوان والمحتوى")
     try:
@@ -397,8 +357,8 @@ async def incident_report(
     current_user: dict = Depends(_require_admin),
 ):
     """مساعد كتابة تقارير حوادث/سلوك بـ AI"""
-    summary = (body.get("summary") or "").strip()[:3000]
-    incident_type = str(body.get("type", "سلوكي"))[:50]
+    summary = (body.get("summary") or "").strip()
+    incident_type = body.get("type", "سلوكي")
     if not summary:
         raise HTTPException(400, "اكتب ملخص الحادثة")
     from app.services.ai_service import chat_with_gemini

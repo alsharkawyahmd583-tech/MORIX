@@ -24,22 +24,10 @@
 body {
   margin: 0;
   padding: 0;
-  background: var(--bg1, #00000e);
+  background: linear-gradient(135deg, #0a0f2c 0%, #05060f 100%);
   min-height: 100vh;
-  color: var(--text, #dff4ff);
+  color: var(--text-primary);
   direction: rtl;
-  transition: background 0.3s, color 0.3s;
-}
-
-/* Light theme overrides for body */
-:root[data-theme="light"] body {
-  background: #f0f4f8;
-  color: #0f172a;
-}
-
-:root[data-theme="library"] body {
-  background: #1a1207;
-  color: #f5e6c8;
 }
 
 /* ============================================
@@ -84,115 +72,69 @@ body {
    البطاقات
    ============================================ */
 .memorix-card {
-  background: var(--card, rgba(11, 14, 31, 0.8));
-  border: 1px solid var(--border, var(--border-color, #1a1f3a));
-  border-radius: var(--radius, 16px);
-  backdrop-filter: var(--card-blur, blur(10px));
-  box-shadow: var(--shadow, none);
-  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+  background: rgba(11, 14, 31, 0.8);
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  backdrop-filter: blur(10px);
 }
 
 .memorix-card:hover {
-  border-color: var(--accent, rgba(74, 126, 255, 0.4));
-  box-shadow: var(--shadow-hover, 0 4px 20px rgba(74,126,255,0.12));
+  border-color: rgba(74, 126, 255, 0.4);
+  transition: border-color 0.3s ease;
 }
 
 /* ============================================
    الأزرار
    ============================================ */
 .btn-primary {
-  background: var(--btn-gradient, linear-gradient(135deg, #4a7eff, #8b5cf6));
-  color: var(--btn-text, white);
+  background: linear-gradient(135deg, #4a7eff, #8b5cf6);
+  color: white;
   border: none;
-  border-radius: var(--radius-sm, 10px);
+  border-radius: 10px;
   padding: 12px 24px;
   font-size: 16px;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.3s ease;
   font-family: 'Tajawal', sans-serif;
-  box-shadow: var(--btn-glow, none);
 }
 
 .btn-primary:hover {
   transform: translateY(-2px);
-  box-shadow: var(--shadow-hover, 0 8px 25px rgba(74, 126, 255, 0.4));
+  box-shadow: 0 8px 25px rgba(74, 126, 255, 0.4);
 }
 
 .btn-primary:disabled {
   opacity: 0.5;
   cursor: not-allowed;
   transform: none;
-  box-shadow: none;
 }
 
 /* ============================================
    الحقول
    ============================================ */
 .memorix-input {
-  background: var(--input-bg, rgba(26, 31, 58, 0.6));
-  border: 1px solid var(--input-border, var(--border-color, #1a1f3a));
-  border-radius: var(--radius-sm, 10px);
+  background: rgba(26, 31, 58, 0.6);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
   padding: 12px 16px;
-  color: var(--text, var(--text-primary, #e2e8f0));
+  color: var(--text-primary);
   font-size: 15px;
   font-family: 'Tajawal', sans-serif;
   width: 100%;
   direction: ltr;
-  transition: border-color 0.3s ease, background 0.3s ease;
+  transition: border-color 0.3s ease;
 }
 
 .memorix-input:focus {
   outline: none;
-  border-color: var(--accent, var(--blue, #4a7eff));
-  background: var(--input-focus, rgba(26,31,58,0.8));
-  box-shadow: 0 0 0 3px rgba(74, 126, 255, 0.1);
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px rgba(74, 126, 255, 0.15);
 }
 
 .memorix-input::placeholder {
-  color: var(--t2, var(--text-muted, #94a3b8));
+  color: var(--text-muted);
   direction: ltr;
-}
-
-/* ============================================
-   Light Theme — visibility fixes
-   ============================================ */
-:root[data-theme="light"] h1,
-:root[data-theme="light"] h2,
-:root[data-theme="light"] h3,
-:root[data-theme="light"] h4 {
-  color: var(--text) !important;
-}
-
-:root[data-theme="light"] .memorix-card,
-:root[data-theme="light"] .card {
-  color: var(--text);
-}
-
-:root[data-theme="light"] .memorix-card h2,
-:root[data-theme="light"] .memorix-card h3,
-:root[data-theme="light"] .memorix-card p,
-:root[data-theme="light"] .memorix-card span,
-:root[data-theme="light"] .memorix-card label,
-:root[data-theme="light"] .memorix-card li,
-:root[data-theme="light"] .memorix-card td,
-:root[data-theme="light"] .memorix-card th {
-  color: inherit;
-}
-
-:root[data-theme="light"] .hub-side {
-  background: var(--sidebar-bg);
-  border-color: var(--border);
-}
-
-:root[data-theme="light"] .text-xs,
-:root[data-theme="light"] .text-sm {
-  color: var(--t2);
-}
-
-:root[data-theme="light"] select.memorix-input {
-  color: var(--text);
-  background: var(--input-bg);
 }
 
 /* ============================================
@@ -273,8 +215,8 @@ img, video, iframe {
   width: 44px;
   height: 44px;
   border-radius: 12px;
-  background: var(--accent, rgba(99, 102, 241, 0.9));
-  color: var(--btn-text, #fff);
+  background: rgba(99, 102, 241, 0.9);
+  color: #fff;
   border: none;
   font-size: 22px;
   cursor: pointer;
@@ -548,208 +490,3 @@ button, [role="button"] {
   touch-action: manipulation;
   -webkit-touch-callout: none;
 }
-
-/* ═══════════════════════════════════════════════════════════════
-   🎨 THEME-SPECIFIC GLOBAL OVERRIDES
-   All hub views use CSS vars → themes work automatically
-   ═══════════════════════════════════════════════════════════════ */
-
-/* Hub background */
-.hub { background: var(--bg1) !important; }
-
-/* Sidebar */
-.hub .sidebar,
-.hub aside {
-  background: var(--sidebar-bg) !important;
-  border-left: var(--sidebar-border) !important;
-  border-right: none !important;
-}
-
-/* Top bar */
-.hub .top-bar,
-.hub header {
-  background: var(--topbar-bg) !important;
-  border-bottom: var(--topbar-border) !important;
-}
-
-/* Cards */
-.hub .card {
-  background: var(--card) !important;
-  border: 1px solid var(--border) !important;
-  border-radius: var(--radius) !important;
-  box-shadow: var(--shadow) !important;
-}
-.hub .card:hover { box-shadow: var(--shadow-hover) !important; }
-
-/* Brand icon */
-.hub .brand-icon {
-  background: var(--brand-gradient) !important;
-  color: var(--brand-text) !important;
-}
-
-/* Nav items */
-.hub .nav-item { color: var(--t2) !important; }
-.hub .nav-item:hover { background: var(--nav-hover-bg) !important; color: var(--text) !important; }
-.hub .nav-item.active {
-  background: var(--nav-active-bg) !important;
-  color: var(--accent) !important;
-  box-shadow: none !important;
-}
-
-/* Action buttons */
-.hub .btn-p {
-  background: var(--btn-gradient) !important;
-  color: var(--btn-text) !important;
-  box-shadow: none !important;
-}
-.hub .send-btn,
-.hub .new-conv-btn {
-  background: var(--accent) !important;
-  color: var(--btn-text) !important;
-}
-
-/* Inputs */
-.hub .inp,
-.hub input.inp,
-.hub textarea.inp,
-.hub select.inp {
-  background: var(--input-bg) !important;
-  border-color: var(--input-border) !important;
-  color: var(--text) !important;
-}
-.hub .inp:focus { border-color: var(--accent) !important; }
-
-/* Avatar */
-.hub .avatar { background: var(--btn-gradient) !important; color: var(--btn-text) !important; }
-
-/* List items */
-.hub .list-item,
-.hub .conv-item {
-  background: var(--bg2) !important;
-  border-color: var(--border) !important;
-}
-
-/* Modals */
-.hub .modal-box { background: var(--modal-bg) !important; border-color: var(--border) !important; }
-
-/* Text colors */
-.hub .text-muted,
-.hub [class*="muted"] { color: var(--t2) !important; }
-
-/* Scrollbar */
-.hub ::-webkit-scrollbar-track { background: var(--bg2); }
-.hub ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
-.hub ::-webkit-scrollbar-thumb:hover { background: var(--accent); }
-
-/* ── Matrix: hidden in light & library ── */
-[data-theme="light"]   canvas,
-[data-theme="library"] canvas { opacity: 0 !important; pointer-events: none !important; }
-
-/* ── Body background per theme ── */
-[data-theme="dark"]    body { background: #0d1117; color: #e6edf3; }
-[data-theme="light"]   body { background: #f6f8fa; color: #1f2328; }
-[data-theme="library"] body { background: #1a1209; color: #f0ddb8; }
-
-/* ── Light theme: borders & shadows ── */
-[data-theme="light"] .hub .sidebar,
-[data-theme="light"] .hub .top-bar {
-  box-shadow: 0 1px 8px rgba(0,0,0,0.07) !important;
-}
-[data-theme="light"] .hub .card {
-  box-shadow: 0 1px 3px rgba(0,0,0,0.07), 0 0 0 1px rgba(0,0,0,0.05) !important;
-}
-
-/* ── Manager gradient text ── */
-.hub-manager .gradient-text,
-.hub-manager .mgr-gradient-text {
-  background: linear-gradient(135deg, var(--accent), #388bfd) !important;
-  -webkit-background-clip: text !important;
-  -webkit-text-fill-color: transparent !important;
-  background-clip: text !important;
-}
-
-/* ═══════════════════════════════════════════════════════════════
-   🏫 MGR-* CLASSES — ManagerDashboard themed elements
-   These translate inline styles → CSS-var-driven classes
-   ═══════════════════════════════════════════════════════════════ */
-
-.mgr-header {
-  background: var(--topbar-bg, rgba(4,10,28,0.88));
-  border-color: var(--border, rgba(99,102,241,0.15));
-  backdrop-filter: var(--sidebar-blur, blur(14px));
-  -webkit-backdrop-filter: var(--sidebar-blur, blur(14px));
-}
-
-.mgr-tabs {
-  background: var(--bg2, rgba(11,14,31,0.8));
-  border: 1px solid var(--border, rgba(99,102,241,0.15));
-}
-
-.mgr-badge {
-  background: rgba(74,126,255,0.15);
-  color: var(--accent, #4a7eff);
-}
-
-.mgr-muted { color: var(--t2, #94a3b8); }
-
-.mgr-logout-btn {
-  background: rgba(239,68,68,0.1);
-  color: #ef4444;
-  border: 1px solid rgba(239,68,68,0.3);
-}
-.mgr-logout-btn:hover {
-  background: rgba(239,68,68,0.2);
-}
-
-/* Table rows / borders in ManagerDashboard */
-.hub-manager .mgr-row-head { background: var(--bg3, rgba(26,31,58,0.8)); }
-.hub-manager .mgr-border   { border-color: var(--border, #1a1f3a) !important; }
-.hub-manager .mgr-th       { color: var(--t2, #94a3b8); }
-.hub-manager .mgr-td-muted { color: var(--t2, #94a3b8); }
-.hub-manager .mgr-td-text  { color: var(--text, #e2e8f0); }
-
-/* Settings: theme / language selector buttons */
-.hub-manager .mgr-select-btn {
-  background: var(--bg3, #0f172a);
-  border: 2px solid var(--border, #1a1f3a);
-  color: var(--text, #fff);
-  transition: border-color 0.2s, background 0.2s;
-}
-.hub-manager .mgr-select-btn.active {
-  border-color: var(--accent, #6366f1);
-  background: var(--nav-active-bg, rgba(99,102,241,0.15));
-}
-
-/* Section labels inside cards */
-.hub-manager .mgr-label { color: var(--t2, #94a3b8); }
-.hub-manager .mgr-value { color: var(--text, #e2e8f0); }
-.hub-manager .mgr-section-divider { border-color: var(--border, #1a1f3a); }
-
-/* Advisor / chat textareas */
-.hub-manager .mgr-textarea {
-  background: var(--input-bg, rgba(15,23,42,0.9));
-  color: var(--text, #fff);
-  border: 1px solid var(--border, #334155);
-}
-
-/* memorix-card inside hub-manager uses CSS vars */
-.hub-manager .memorix-card {
-  background: var(--card, rgba(11,14,31,0.8)) !important;
-  border: 1px solid var(--border, #1a1f3a) !important;
-  border-radius: var(--radius, 16px) !important;
-  backdrop-filter: var(--card-blur, blur(10px)) !important;
-  box-shadow: var(--shadow, none) !important;
-}
-.hub-manager .memorix-card:hover {
-  border-color: var(--accent, rgba(74,126,255,0.4)) !important;
-  box-shadow: var(--shadow-hover, 0 4px 20px rgba(74,126,255,0.15)) !important;
-}
-
-/* Light theme — manager specific */
-[data-theme="light"] .hub-manager .mgr-select-btn { background: #f1f5f9; color: #0f172a; border-color: #cbd5e1; }
-[data-theme="light"] .hub-manager .mgr-select-btn.active { background: rgba(99,102,241,0.1); border-color: #6366f1; }
-[data-theme="light"] .hub-manager .memorix-card { box-shadow: 0 2px 16px rgba(0,0,0,0.07) !important; }
-
-/* Library theme — manager */
-[data-theme="library"] .hub-manager .memorix-card { border-left: 3px solid var(--accent, #d4892a) !important; }
-

@@ -56,9 +56,13 @@ async def respond_to_complaint(
     current_user: dict = Depends(_require_owner),
     db=Depends(get_db)
 ):
+    _valid_statuses = {"pending", "reviewed", "resolved"}
+    status = body.get("status", "reviewed")
+    if status not in _valid_statuses:
+        status = "reviewed"
     db.table("complaints").update({
-        "status": body.get("status", "reviewed"),
-        "response": body.get("response", "")
+        "status": status,
+        "response": str(body.get("response", ""))[:2000]
     }).eq("id", complaint_id).execute()
     return {"message": "تم تحديث الشكوى"}
 
@@ -231,7 +235,7 @@ async def churn_risk(current_user: dict = Depends(_require_owner), db=Depends(ge
 async def get_owner_settings(current_user: dict = Depends(_require_owner), db=Depends(get_db)):
     result = db.table("user_settings").select("*").eq("user_id", current_user["id"]).execute()
     base = {
-        "theme": "dark", "language": "ar",
+        "theme": "dark", "brightness": 100, "language": "ar",
         "notifications_enabled": True,
         "avatar_url": current_user.get("avatar_url", ""),
         "email": current_user.get("email", ""),
@@ -245,13 +249,15 @@ async def get_owner_settings(current_user: dict = Depends(_require_owner), db=De
 @router.put("/settings")
 async def update_owner_settings(body: dict, current_user: dict = Depends(_require_owner), db=Depends(get_db)):
     valid_langs = {"ar", "en", "de", "fr", "zh", "es"}
-    valid_themes = {"dark", "light", "library", "neon"}
+    valid_themes = {"dark", "light", "library"}
     theme = body.get("theme", "dark")
     if theme not in valid_themes: theme = "dark"
     lang = body.get("language", "ar")
     if lang not in valid_langs: lang = "ar"
+    try: brightness = max(20, min(100, int(body.get("brightness", 100))))
+    except: brightness = 100
     data = {
-        "user_id": current_user["id"], "theme": theme,
+        "user_id": current_user["id"], "theme": theme, "brightness": brightness,
         "language": lang, "notifications_enabled": bool(body.get("notifications_enabled", True)),
     }
     try:
@@ -275,8 +281,8 @@ async def broadcast_message(
     db=Depends(get_db),
 ):
     """بث رسالة لكل مستخدمي المنصة"""
-    title = str(body.get("title", "إعلان من إدارة Morix"))[:200]
-    content = (body.get("content") or "").strip()[:2000]
+    title = body.get("title", "إعلان من إدارة Morix")
+    content = (body.get("content") or "").strip()
     if not content:
         raise HTTPException(400, "اكتب محتوى الإعلان")
     try:

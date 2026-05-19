@@ -1,13 +1,13 @@
 # نماذج البيانات - Morix Platform
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel
 from typing import Optional, List, Any
 from datetime import datetime
 from app.config import settings
 
 
 class LoginRequest(BaseModel):
-    email: str = Field(..., max_length=254)   # RFC 5321 حد الإيميل
-    password: str = Field(..., min_length=1, max_length=128)
+    email: str
+    password: str
 
     @classmethod
     def validate_email_domain(cls, v):
@@ -23,8 +23,8 @@ class TokenResponse(BaseModel):
 
 
 class ChangePasswordRequest(BaseModel):
-    old_password: str = Field(..., min_length=1, max_length=128)
-    new_password: str = Field(..., min_length=6, max_length=128)
+    old_password: str
+    new_password: str
 
 
 class SchoolSetupRequest(BaseModel):
@@ -69,11 +69,10 @@ class DiagnosticResult(BaseModel):
 
 class ChatMessage(BaseModel):
     conversation_id: Optional[str] = None
-    message: str = Field(..., min_length=1, max_length=8000)   # حد منطقي للرسالة
+    message: str
     book_id: Optional[str] = None
-    image_base64: Optional[str] = Field(None, max_length=2_000_000)  # ~1.5MB صورة
-    file_text: Optional[str] = Field(None, max_length=80_000)        # 80K حرف نص ملف
-    language: Optional[str] = Field(None, max_length=10)             # لغة المستخدم (ar, en, es, fr, de, zh)
+    image_base64: Optional[str] = None   # base64 صورة مرفقة
+    file_text: Optional[str] = None      # نص ملف مرفق (PDF/TXT)
 
 
 class ChatResponse(BaseModel):
@@ -90,10 +89,10 @@ class ConversationSummary(BaseModel):
 
 
 class BookCreate(BaseModel):
-    title: str = Field(..., min_length=1, max_length=300)
-    subject: str = Field(..., min_length=1, max_length=100)
-    grade: str = Field(..., min_length=1, max_length=50)
-    raw_text: Optional[str] = Field(None, max_length=500_000)  # نص الكتاب حتى 500K حرف
+    title: str
+    subject: str
+    grade: str
+    raw_text: Optional[str] = None
     key_concepts: Optional[List[str]] = []
 
 
@@ -118,22 +117,23 @@ class StatsResponse(BaseModel):
 
 
 class UserSettingsUpdate(BaseModel):
-    theme: Optional[str] = Field(None, max_length=30)
+    theme: Optional[str] = None
     notifications_enabled: Optional[bool] = None
-    difficulty: Optional[str] = Field(None, max_length=20)
+    brightness: Optional[int] = None
+    difficulty: Optional[str] = None
     hobbies: Optional[List[str]] = None
-    language: Optional[str] = Field(None, max_length=10)
-    avatar_url: Optional[str] = Field(None, max_length=500_000)  # base64 صورة مضغوطة
+    language: Optional[str] = None
+    avatar_url: Optional[str] = None  # يُخزَّن في جدول users
 
 
 class ComplaintCreate(BaseModel):
-    type: str = Field("complaint", max_length=30)
-    title: str = Field(..., min_length=1, max_length=200)
-    content: str = Field(..., min_length=1, max_length=3000)
+    type: str = "complaint"
+    title: str
+    content: str
 
 
 class ImageGenerateRequest(BaseModel):
-    prompt: str = Field(..., min_length=3, max_length=500)
+    prompt: str
 
 
 class GameGenerateRequest(BaseModel):
