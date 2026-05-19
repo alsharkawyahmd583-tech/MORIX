@@ -88,5 +88,36 @@
       }
     </script>
     <script src="//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit" async defer></script>
+
+    <!-- إعادة تطبيق الترجمة على المحتوى الديناميكي الجديد -->
+    <script>
+      (function () {
+        var _timer = null
+
+        function _reapply() {
+          var lang = localStorage.getItem('morix_lang') || 'ar'
+          if (lang === 'ar' || !window.__morixTranslate) return
+          clearTimeout(_timer)
+          _timer = setTimeout(function () {
+            window.__morixTranslate(lang)
+          }, 500)
+        }
+
+        function _startObserver() {
+          var app = document.getElementById('app')
+          if (!app) { setTimeout(_startObserver, 500); return }
+
+          new MutationObserver(function (mutations) {
+            for (var m of mutations) {
+              if (m.addedNodes.length > 0) { _reapply(); break }
+            }
+          }).observe(app, { childList: true, subtree: true })
+        }
+
+        window.addEventListener('load', function () {
+          setTimeout(_startObserver, 1000)
+        })
+      })()
+    </script>
   </body>
 </html>
