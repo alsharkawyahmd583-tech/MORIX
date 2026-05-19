@@ -1,13 +1,13 @@
 <template>
   <div class="custom-translate-container">
-    <button @click="toggle" class="lang-button">اللغة / Language</button>
+    <button @click="toggle" class="lang-button">🌐 اللغة</button>
     <div :class="['lang-dropdown', 'notranslate', { show: isOpen }]">
-      <a href="javascript:void(0)" @click="select('ar')">العربية</a>
-      <a href="javascript:void(0)" @click="select('en')">English</a>
-      <a href="javascript:void(0)" @click="select('zh')">中文</a>
-      <a href="javascript:void(0)" @click="select('fr')">Français</a>
-      <a href="javascript:void(0)" @click="select('de')">Deutsch</a>
-      <a href="javascript:void(0)" @click="select('es')">Español</a>
+      <a href="javascript:void(0)" @click="select('ar')">🇸🇦 العربية</a>
+      <a href="javascript:void(0)" @click="select('en')">🇬🇧 English</a>
+      <a href="javascript:void(0)" @click="select('zh')">🇨🇳 中文</a>
+      <a href="javascript:void(0)" @click="select('fr')">🇫🇷 Français</a>
+      <a href="javascript:void(0)" @click="select('de')">🇩🇪 Deutsch</a>
+      <a href="javascript:void(0)" @click="select('es')">🇪🇸 Español</a>
     </div>
   </div>
 </template>
@@ -58,6 +58,10 @@ onUnmounted(() => window.removeEventListener('click', handleOutsideClick))
     box-shadow: 0 1px 3px rgba(0,0,0,0.05);
     transition: all 0.2s ease-in-out;
     outline: none;
+    /* موبايل: حجم زر مناسب للإصبع */
+    min-height: 44px;
+    min-width: 90px;
+    white-space: nowrap;
 }
 
 .lang-button:hover {
@@ -70,12 +74,12 @@ onUnmounted(() => window.removeEventListener('click', handleOutsideClick))
     display: none;
     position: absolute;
     background-color: #ffffff;
-    min-width: 150px;
+    min-width: 160px;
     box-shadow: 0px 8px 20px rgba(0,0,0,0.08);
-    z-index: 1000;
+    z-index: 10000;
     border-radius: 4px;
     margin-top: 5px;
-    right: 0;
+    left: 0;
     border: 1px solid #eeeeee;
     overflow: hidden;
     animation: slideDown 0.2s ease-out;
@@ -88,12 +92,18 @@ onUnmounted(() => window.removeEventListener('click', handleOutsideClick))
 
 .lang-dropdown a {
     color: #555555;
-    padding: 10px 15px;
+    padding: 12px 15px;
     text-decoration: none;
     display: block;
     text-align: right;
-    font-size: 13px;
+    font-size: 14px;
     transition: background 0.2s;
+    /* موبايل: حجم مناسب للضغط بالإصبع */
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
 }
 
 .lang-dropdown a:hover {
@@ -102,4 +112,16 @@ onUnmounted(() => window.removeEventListener('click', handleOutsideClick))
 }
 
 .show { display: block !important; }
+
+/* موبايل */
+@media (max-width: 480px) {
+    .lang-button {
+        padding: 8px 14px;
+        font-size: 13px;
+        min-width: 80px;
+    }
+    .lang-dropdown {
+        min-width: 150px;
+    }
+}
 </style>

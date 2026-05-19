@@ -1,8 +1,5 @@
 <template>
   <div class="login-page">
-    <div class="translate-wrapper">
-      <TranslateButton />
-    </div>
     <div class="login-card">
       <div class="logo-section">
         <div class="logo-icon">M</div>
@@ -55,7 +52,6 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth.js'
-import TranslateButton from '../components/TranslateButton.vue'
 
 const router = useRouter()
 const auth = useAuthStore()
@@ -84,12 +80,6 @@ function fillDemo(e, p) {
 </script>
 
 <style scoped>
-.translate-wrapper {
-  position: fixed;
-  top: 16px;
-  left: 16px;
-  z-index: 100;
-}
 .login-page {
   min-height: 100vh;
   display: flex;
