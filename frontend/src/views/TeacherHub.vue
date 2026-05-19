@@ -66,11 +66,20 @@
             </div>
           </div>
         </div>
-        <div v-if="submissions.length" class="card mt">
-          <h3>📥 التسليمات</h3>
-          <div class="list-col">
+        <div v-if="subHwId" class="card mt">
+          <div class="row-sb">
+            <h3>📥 التسليمات</h3>
+            <button class="btn-o" @click="subHwId=null;submissions=[];subError=''" style="padding:4px 10px">✕</button>
+          </div>
+          <div v-if="subLoading" class="empty">⏳ جاري التحميل...</div>
+          <div v-else-if="subError" style="color:#f87171;padding:12px;font-size:14px">⚠️ {{ subError }}</div>
+          <div v-else-if="!submissions.length" class="empty">📭 لا توجد تسليمات لهذا الواجب بعد</div>
+          <div v-else class="list-col">
             <div v-for="s in submissions" :key="s.id" class="list-item">
-              <div><h4>{{ s.users?.full_name }}</h4><p style="color:var(--t2);font-size:13px">{{ s.content }}</p></div>
+              <div style="flex:1">
+                <h4>{{ s.users?.full_name || 'طالب غير معروف' }}</h4>
+                <p style="color:var(--t2);font-size:13px;margin:4px 0 0;white-space:pre-wrap">{{ s.content }}</p>
+              </div>
             </div>
           </div>
         </div>
@@ -698,6 +707,9 @@ const hwForm = ref(false)
 const hwLoading = ref(false)
 const hwNew = ref({topic:'',subject:'',grade:'',due_date:''})
 const submissions = ref([])
+const subLoading = ref(false)
+const subError = ref('')
+const subHwId = ref(null)
 
 const myTests = ref([])
 const testForm = ref(false)
@@ -780,7 +792,20 @@ async function createHw() {
   } catch {} finally { hwLoading.value=false }
 }
 async function deleteHw(id) { try { await teacherAPI.deleteHomework(id); await loadHomework() } catch {} }
-async function viewSubmissions(id) { try { submissions.value=(await teacherAPI.getSubmissions(id)).data } catch {} }
+async function viewSubmissions(id) {
+  subHwId.value = id
+  subLoading.value = true
+  subError.value = ''
+  submissions.value = []
+  try {
+    const r = await teacherAPI.getSubmissions(id)
+    submissions.value = Array.isArray(r.data) ? r.data : []
+  } catch (e) {
+    subError.value = e.response?.data?.detail || 'تعذر جلب التسليمات، حاول مرة أخرى'
+  } finally {
+    subLoading.value = false
+  }
+}
 
 async function createTest() {
   testLoading.value=true
@@ -1026,7 +1051,7 @@ async function loadPrompts() {
   plLoading.value = false
 }
 function copyPrompt(t) {
-  navigator.clipboard?.writeText(t).catch(()=>{})
+  navigator.clipboard?.writeText(t)
   alert('✅ تم نسخ القالب')
 }
 

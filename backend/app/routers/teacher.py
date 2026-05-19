@@ -73,10 +73,18 @@ async def delete_homework(homework_id: str, current_user: dict = Depends(_requir
 
 @router.get("/homework/{homework_id}/submissions")
 async def get_submissions(homework_id: str, current_user: dict = Depends(_require_teacher), db=Depends(get_db)):
-    result = db.table("homework_submissions") \
-        .select("*, users!student_id(full_name, grade)") \
-        .eq("homework_id", homework_id).execute()
-    return result.data
+    # التحقق من أن الواجب يخص هذا المعلم
+    hw_check = db.table("homework").select("id").eq("id", homework_id).eq("teacher_id", current_user["id"]).execute()
+    if not hw_check.data:
+        raise HTTPException(status_code=404, detail="الواجب غير موجود أو لا ينتمي لحسابك")
+    try:
+        result = db.table("homework_submissions") \
+            .select("*, users!student_id(full_name, grade)") \
+            .eq("homework_id", homework_id).execute()
+        return result.data or []
+    except Exception as e:
+        logger.warning(f"homework_submissions query failed: {e}")
+        return []
 
 
 # ============================================
@@ -325,7 +333,7 @@ show(0);
 
 
 @router.post("/generate-video")
-async def generate_video_script(body: dict, current_user: dict = Depends(_require_teacher)):
+async def generate_video_script(body: dict, current_user: dict = Depends(get_current_user)):
     from app.services.ai_service import generate_video_script
 
     topic = body.get("topic", "")
